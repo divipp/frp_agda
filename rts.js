@@ -23,7 +23,7 @@ function makeWidget(widget_description) {
       res = document.createElement("button");
       res.setAttribute("input", "button"); 
       res.setAttribute("onclick", "click_event(this)"); 
-      res.innerHTML = s;
+      res.textContent = s;
       }
     ,"Checkbox": function (checked) {
       res = document.createElement("input");
@@ -32,7 +32,7 @@ function makeWidget(widget_description) {
       }
     ,"Label": function (na) {
       res = document.createElement("span");
-      res.innerHTML = na;
+      res.textContent = na;
       }
     ,"Entry": function (na) {
       res = document.createElement("input");
@@ -62,9 +62,12 @@ function updateWidget(el, ch) { ch (
   ,"replaceBy": function (_, w) {
     el.parentNode.replaceChild(makeWidget(w), el);
     }
-  ,"setLabel": function (_, n) {
-    //console.log('setlabel', n);
-    el.innerHTML = n;
+  ,"setLabel": function (_, str) {
+    //console.log('setlabel', str);
+    el.textContent = str;
+    }
+  ,"setEntry": function (_1, _2, str) {
+    el.value = str;
     }
   ,"toggle": function (_1, _2) {
     el.checked = not(el.checked);
@@ -97,5 +100,7 @@ function gen_event(el, inn) {
 };
 
 function click_event (el) { return gen_event(el, null); };
-function entry_event (el) { return gen_event(el, null); }; // TODO
+function entry_event (el) {
+  return gen_event(el, function (mod_rec) {return mod_rec["setEntry"](null,null, el.value)});
+};
 

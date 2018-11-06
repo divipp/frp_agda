@@ -72,7 +72,7 @@ _∘ᵗ_ : ∀ {p q r} → Agent I (alter p q) → Agent I (alter q r) → Agent
 
 -- stream processors
 SP : Set → Set → Set₁
-SP A B = Agent I (alter (constᵀ A) (constᵀ B))
+SP A B = Agent I (alter' A B)
 
 arr : ∀ {A B} → (A → B) → SP A B
 arr f .step x .step = f x , arr f
@@ -80,6 +80,11 @@ arr f .step x .step = f x , arr f
 accum : ∀ {A B} → (A → B → B) → B → SP A B
 accum f b .step a .step with f a b
 ... | b' = b' , accum f b'
+
+maybefy : ∀ {A B} → SP A B → SP (Maybe A) (Maybe B)
+maybefy f .step nothing .step = nothing , (maybefy f)
+maybefy f .step (just a) .step with f .step a .step
+... | x , y = just x , maybefy y
 
 -- interaction transformers are interactions
 IT : (p q : Tree) → Set₁
@@ -201,10 +206,17 @@ checkbox {true} O .step (just false) .step = toggle , checkbox I
 checkbox {false} O .step (just true) .step = toggle , checkbox I
 checkbox O .step (just _) .step = same , checkbox I
 
-label : ∀ {n} d → flipᵈ d IT (pw d (Label n)) (flipᵈ d alter' ⊤ String)
+label : ∀ {n} d → flipᵈ d IT (pw d (Label n)) (flipᵈ d alter' ⊤ (Maybe String))
 label I .step nothing  .step = _ , label O
 label I .step (just ())
-label O .step m .step = setLabel m , label I
+label O .step nothing .step = same , label I
+label O .step (just m) .step = setLabel m , label I
+
+entry : ∀ {s} d → flipᵈ d IT (pw d (Entry s)) (flipᵈ d alter' (Maybe String) (Maybe String))
+entry I .step nothing  .step = nothing , entry O
+entry I .step (just (setEntry s)) .step = just s , entry O
+entry O .step nothing .step = same , entry I
+entry O .step (just s) .step = setEntry s , entry I
 
 nextTo : ∀ {a b} d → flipᵈ d IT (pw d (a ∥ b)) (pw d a ×ᵀ pw d b)
 nextTo I .step nothing .step = (nothing , nothing) , nextTo O
@@ -234,10 +246,10 @@ _<>_ : GUI → GUI → GUI
 ---------------------------------------------------------------------------------------------------------------
 
 counter = λ n → map' ((button {"+1"} I || label {showNat n} I) ∘ᵀ entangle _ I)
-                     (arr (maybe zero (λ _ → suc zero)) ∘ᵗ accum _+_ n ∘ᵗ arr showNat)
+                     (maybefy (arr (const (suc zero)) ∘ᵗ accum _+_ n ∘ᵗ arr showNat))
 
 counter' = λ f b n → map' ((checkbox {b} I || label {showNat n} I) ∘ᵀ entangle nothing I)
-                     (arr (maybe zero f) ∘ᵗ accum _+_ n ∘ᵗ arr showNat)
+                     (maybefy (arr f ∘ᵗ accum _+_ n ∘ᵗ arr showNat))
 
 _*2 = λ x → ease' x <> ease' x
 
@@ -245,5 +257,6 @@ mainWidget = ((_ , counter zero)
            <> (_ , counter' (if_then suc zero else zero) false zero)
            <> (_ , counter' (λ _ → suc zero) false zero)
            <> (_ , counter' (if_then zero else suc zero) false zero)
+           <> (_ , map' ((entry {""} I || label {""} I) ∘ᵀ entangle nothing I) (maybefy (arr id)))
              ) *2 *2 *2 *2 *2
 
