@@ -3,10 +3,12 @@ module Reactive where
 
 open import Prelude
 
-infixr 9 _∘ᵗ_ _∘ᵀ_
+infixr 9 _∘ᵗ_ _∘ᵀ_ _∘ᵇ_ _∙_
+infixl 9 _∘ʷ_
 infix 4 _,ᵀ_ _,ᵗ_
 infix 2 _×ᵀ_
 
+-- Coinductive trees will represent protocols of interactions
 record Tree : Set₁ where
   coinductive
   field
@@ -27,6 +29,18 @@ alter : Tree → Tree → Tree
 alter p q .Branch = p .Branch
 alter p q .child hp = alter q (p .child hp)
 
+alter' : Set → Set → Tree
+alter' A B = alter (constᵀ A) (constᵀ B)
+
+-- signals
+Sig : (A B : Set) → Tree
+Sig A B = alter' (Maybe A) (Maybe B)
+
+NoSig = Sig ⊥ ⊥
+OutSig = λ A → Sig A ⊥
+InSig = λ A → Sig ⊥ A
+BiSig = λ A → Sig A A
+
 {-
 p:  P₁    P₂ -> P₃    P₄  ...
     |     ^     |     ^
@@ -38,12 +52,46 @@ merge p q .Branch = p .Branch
 merge p q .child hp .Branch = q .Branch
 merge p q .child hp .child hq = merge (q .child hq) (p .child hp)
 
-alter' : Set → Set → Tree
-alter' A B = alter (constᵀ A) (constᵀ B)
+union2 : Tree → Tree → Tree
+union2 p q .Branch = p .Branch ⊎ q .Branch
+union2 p q .child (inj₁ ph) with p .child ph
+... | r = λ where .Branch → q .Branch
+                  .child rh → union2 r (q .child rh)
+union2 p q .child (inj₂ qh) with q .child qh
+... | r = λ where .Branch → p .Branch
+                  .child rh → union2 (p .child rh) r
+
+-- TODO: express with simpler combinators?
+union2mb : Tree → Tree → Tree
+union2mb p q .Branch = Maybe (p .Branch ⊎ q .Branch)
+union2mb p q .child (just (inj₁ ph)) with p .child ph
+... | r = λ where .Branch → q .Branch
+                  .child rh → union2mb r (q .child rh)
+union2mb p q .child (just (inj₂ qh)) with q .child qh
+... | r = λ where .Branch → p .Branch
+                  .child rh → union2mb (p .child rh) r
+union2mb p q .child nothing .Branch = ⊤
+union2mb p q .child nothing .child _ = union2mb p q
+
+---------------------------------------
+
+-- patchable structure
+record Patchable : Set₁ where
+  constructor Patch'
+  field
+    Document : Set
+    PatchOf : Document → Set
+    patch : {s : Document} → PatchOf s → Document
+
+open Patchable
+
+patches : (p : Patchable) → Document p → Tree
+patches p s .Branch = p .PatchOf s
+patches p s .child r = patches p (p .patch r)
 
 -----------------------------
 
-data I/O : Set where I O : I/O   -- input, output directions
+data I/O : Set where I O : I/O   -- input and output phases
 
 opposite : I/O → I/O
 opposite I = O
@@ -53,6 +101,12 @@ opposite O = I
 ΠΣ I = Π
 ΠΣ O = Σ
 
+⟨_⟩ : {A B : Set} → I/O → (A → A → B) → A → A → B
+⟨ I ⟩ = id
+⟨ O ⟩ = flip
+
+-- an interactive agent which communcates according to the protocol p
+-- an agent can be called either in input or in output phase
 record Agent (i/o : I/O) (p : Tree) : Set₁ where
   coinductive
   field
@@ -74,6 +128,10 @@ _∘ᵗ_ : ∀ {p q r} → Agent I (alter p q) → Agent I (alter q r) → Agent
 SP : Set → Set → Set₁
 SP A B = Agent I (alter' A B)
 
+SPM : Set → Set → Set₁
+-- same as  Agent I (Sig A B)
+SPM A B = SP (Maybe A) (Maybe B)
+
 arr : ∀ {A B} → (A → B) → SP A B
 arr f .step x .step = f x , arr f
 
@@ -81,25 +139,21 @@ accum : ∀ {A B} → (A → B → B) → B → SP A B
 accum f b .step a .step with f a b
 ... | b' = b' , accum f b'
 
-maybefy : ∀ {A B} → SP A B → SP (Maybe A) (Maybe B)
+maybefy : ∀ {A B} → SP A B → SPM A B
 maybefy f .step nothing .step = nothing , (maybefy f)
 maybefy f .step (just a) .step with f .step a .step
 ... | x , y = just x , maybefy y
 
--- interaction transformers are interactions
+-- synchronous interaction transformers
 IT : (p q : Tree) → Set₁
 IT p q = Agent I (merge p q)
 
-flipᵈ : {A B : Set} → I/O → (A → A → B) → A → A → B
-flipᵈ I = id
-flipᵈ O = flip
-
-map' : ∀ {d p q} → flipᵈ d IT q p → Agent d p → Agent d q
-map' {I} l i .step hq with l .step hq .step
-... | a , l2 = map' l2 (i .step a)
-map' {O} l i .step with i .step
+mapAgent : ∀ {d p q} → ⟨ d ⟩ IT q p → Agent d p → Agent d q
+mapAgent {I} l i .step hq with l .step hq .step
+... | a , l2 = mapAgent l2 (i .step a)
+mapAgent {O} l i .step with i .step
 ... | a , b with l .step a .step
-... | c , l2 = c , (map' l2 b)
+... | c , l2 = c , (mapAgent l2 b)
 
 _∘ᵀ_ : ∀ {p q r} → IT p q → IT q r → IT p r
 (b ∘ᵀ a) .step ph .step with b .step ph .step
@@ -110,42 +164,129 @@ _,ᵗ_ : ∀ {p q r s} → IT p q → IT r s → IT (p ×ᵀ r) (q ×ᵀ s)
 _,ᵗ_ a b .step (k , l) .step with a .step k .step | b .step l .step
 ... | c , d | e , f = (c , e) , (d ,ᵗ f)
 
-entangle : ∀ {A B C D} → D → (d : I/O) → flipᵈ d IT (flipᵈ d alter A (constᵀ D) ×ᵀ flipᵈ d alter C B) (flipᵈ d alter A B)
-entangle d I .step (x , _) .step = x , entangle d O
-entangle d O .step x .step = (d , x) , entangle d I
+idIT : ∀ {p} → IT p p
+idIT .step a .step = a , idIT
 
----------------------------------------
+swapIT : ∀ {p q} → IT (p ×ᵀ q) (q ×ᵀ p)
+swapIT .step (a , b) .step = (b , a) , swapIT
 
--- patchable structure
-record Patchable : Set₁ where
-  constructor Patch'
-  field
-    Document : Set
-    PatchOf : Document → Set
-    patch : {s : Document} → PatchOf s → Document
+assocIT : ∀ {d p q r} → ⟨ d ⟩ IT ((p ×ᵀ q) ×ᵀ r) (p ×ᵀ (q ×ᵀ r))
+assocIT {I} .step ((a , b) , c) . step = (a , (b , c)) , assocIT {O}
+assocIT {O} .step (a , (b , c)) . step = ((a , b) , c) , assocIT {I}
 
-open Patchable
+fstSig : ∀ {p A B} → IT (p ×ᵀ Sig A B) p
+fstSig .step (x , y) .step = x , λ where .step x .step → (x , nothing) , fstSig
 
-patches : (p : Patchable) → Document p → Tree
-patches p s .Branch = p .PatchOf s
-patches p s .child r = patches p (p .patch r)
+joinSig : ∀ {d A B C D} → A → B → ⟨ d ⟩ IT (⟨ d ⟩ Sig A C ×ᵀ ⟨ d ⟩ Sig B D) (⟨ d ⟩ Sig (A × B) (C × D))
+joinSig {I} a b .step (nothing , nothing) .step = nothing , joinSig {O} a b
+joinSig {I} a b .step (nothing , just y) .step = just (a , y) , joinSig {O} a y
+joinSig {I} a b .step (just x , nothing) .step = just (x , b) , joinSig {O} x b
+joinSig {I} a b .step (just x , just y) .step = just (x , y) , joinSig {O} x y
+joinSig {O} a b .step nothing .step = (nothing , nothing) , joinSig {I} a b
+joinSig {O} a b .step (just (x , y)) .step = (just x , just y) , joinSig {I} a b
 
--- cooperative editing of a document
-CoEdit : I/O → (p : Patchable) → Document p → Set₁
-CoEdit d p s = Agent d (patches p s)
+noInput : ∀ {A B} → IT (Sig A B) (OutSig A)
+noInput .step x .step = x , λ where .step y .step → nothing , noInput
+
+noOutput : ∀ {A B} → IT (Sig A B) (InSig B)
+noOutput .step x .step = nothing , λ where .step y .step → y , noOutput
+
+mkIT : ∀ {d p} → Agent d p → ⟨ d ⟩ IT p NoSig
+mkIT {I} a .step x .step = nothing , mkIT {O} (a .step x)
+mkIT {O} a .step _ .step with a .step
+... | b , c = b , mkIT {I} c
+
+constIT : (S T A B : Set) → Set₁
+constIT S T A B = IT (alter' S T) (alter' A B)
+
+constITM : (S T A B : Set) → Set₁
+constITM S T A B = IT (Sig S T) (Sig A B)
+
+lensIT : ∀ {S T A B} → Lens S T A B → constIT S T A B
+lensIT k .step s .step with k s
+... | a , bt = a , λ where .step b .step → bt b , lensIT k
+
+prismIT : ∀ {S T A B} → Prism S T A B → constITM S T A B
+prismIT f = lensIT (prismToLens f)
+
+mkIT' : ∀ {S T A B} → SP S A → SP B T → constIT S T A B
+mkIT' f g .step s .step with f .step s .step
+... | a , cont = a , (mkIT' g cont)
+
+isoIT : {S T A B : Set} → (S → A) → (B → T) → constIT S T A B
+isoIT f g = lensIT λ x → (f x) , g
+
+-- bidirectional connection
+Bi : (p q : Tree) → Set₁
+Bi p q = Agent I (union2 p q)
+
+_∘ᵇ_ : ∀ {p q r} → Bi p q → Bi q r → Bi p r
+(a ∘ᵇ b) .step (inj₁ x) .step with a .step (inj₁ x) .step
+... | c , d with b .step (inj₁ c) .step
+... | e , f = e , d ∘ᵇ f
+(a ∘ᵇ b) .step (inj₂ x) .step with b .step (inj₂ x) .step
+... | c , d with a .step (inj₂ c) .step
+... | e , f = e , f ∘ᵇ d
+
+isoBi : {A B : Set} → Iso A A B B → Bi (constᵀ A) (constᵀ B)
+isoBi i .step (inj₁ x) .step = (i .proj₁ x) , isoBi i
+isoBi i .step (inj₂ x) .step = (i .proj₂ x) , isoBi i
+
+mmb : ∀ {p q} → Bi p q → Agent I (union2mb p q)
+mmb x .step nothing .step = _ , (mmb x)
+mmb x .step (just (inj₁ y)) .step with x .step (inj₁ y) .step
+... | a , b = a , mmb b
+mmb x .step (just (inj₂ y)) .step with x .step (inj₂ y) .step
+... | a , b = a , mmb b
+
+entangleBi : ∀ {A B} → let p = constᵀ A; q = constᵀ B in IT (Sig A A ×ᵀ Sig B B) (union2mb p q)
+entangleBi .step (nothing , nothing) .step = nothing , λ where .step _ .step → (nothing , nothing) , entangleBi
+entangleBi .step (just x , nothing) .step = just (inj₁ x) , λ where .step z .step → (nothing , just z) , entangleBi
+entangleBi .step (nothing , just x) .step = just (inj₂ x) , λ where .step z .step → (just z , nothing) , entangleBi
+entangleBi .step (just x , just y) .step = nothing , λ where .step _ .step → (nothing , nothing) , entangleBi
+
+entangle : ∀ {A B C} → IT (Sig A C ×ᵀ Sig C B) (Sig A B)
+entangle .step (a , c) .step = a , λ where .step b .step → (c , b) , entangle
+
+enta : ∀ {A B C} → SP A B → IT (Sig A C ×ᵀ Sig C B) NoSig
+enta x = entangle ∘ᵀ mkIT (maybefy x)
+
+entaBi : ∀ {A B} → Bi (constᵀ A) (constᵀ B) → IT (Sig A A ×ᵀ Sig B B) NoSig
+entaBi x = entangleBi ∘ᵀ mkIT (mmb x)
 
 ---------------------------------------------------------------------
 
+data Direction : Set where horizontal vertical : Direction
+data Abled : Set where enabled disabled : Abled
+
+oppositeᵉ : Abled → Abled
+oppositeᵉ enabled = disabled
+oppositeᵉ disabled = enabled
+
+isEnabled : I/O → Abled → Set
+isEnabled I enabled  = ⊤
+isEnabled I disabled = ⊥
+isEnabled O _ = ⊤
+
 -- abstract widget
 data Widget : Set where
-  Button   : String → Widget
-  Checkbox : Bool → Widget
-  Label    : String → Widget
-  Entry    : String → Widget   -- input field
-  Empty    : Widget
-  _∥_      : Widget → Widget → Widget
+  Button    : Abled → String → Widget
+  CheckBox  : Abled → Bool → Widget
+  ComboBox  : Abled → {n : ℕ} → Vec String n → Fin n → Widget
+  Entry     : Abled → (size : ℕ)(name contents : String)(valid : Bool) → Widget
+  Label     : String → Widget
+  Empty     : Widget
+  Container : Direction → Widget → Widget → Widget
 
-infixr 5 _∥_
+isInput : (w : Widget) → Maybe (Abled × Widget)
+isInput (Button e x) = just (e , Button (oppositeᵉ e) x)
+isInput (CheckBox e x) = just (e , CheckBox (oppositeᵉ e) x)
+isInput (ComboBox e ss i) = just (e , ComboBox (oppositeᵉ e) ss i)
+isInput (Entry e n s s' v) = just (e , Entry (oppositeᵉ e) n s s' v)
+isInput _ = nothing
+
+isJust : {A : Set} → Maybe A → Set
+isJust = maybe ⊥ (λ _ → ⊤)
 
 -- possible edits of a widget (I: by the user; O: by the program)
 data WidgetEdit : I/O → Widget → Set
@@ -153,110 +294,212 @@ data WidgetEdit : I/O → Widget → Set
 ⟪_⟫ : {d : I/O} {a : Widget} (p : WidgetEdit d a) → Widget
 
 data WidgetEdit  where
-  toggle      : ∀ {d b} → WidgetEdit d (Checkbox b)
-  click       : ∀ {s} → WidgetEdit I (Button s)
-  setLabel    : ∀ {n} → String → WidgetEdit O (Label n)
-  setEntry    : ∀ {d n} → String → WidgetEdit d (Entry n)
-  replaceBy   : ∀ {a} → Widget → WidgetEdit O a
-  modLeft     : ∀ {d a b} → WidgetEdit d a → WidgetEdit d (a ∥ b)
-  modRight    : ∀ {d a b} → WidgetEdit d b → WidgetEdit d (a ∥ b)
-  addToLeft addToRight    : ∀ {a} → Widget → WidgetEdit O a
-  removeLeft removeRight  : ∀ {a b} → WidgetEdit O (a ∥ b)
-  _∙_         : ∀ {a} → (p : WidgetEdit O a) → WidgetEdit O ⟪ p ⟫ → WidgetEdit O a    -- kell?
-  same        : ∀ {a} → WidgetEdit O a
-  _∥_         : ∀ {a b} → WidgetEdit O a → WidgetEdit O b → WidgetEdit O (a ∥ b)
+  toggle         : ∀ {d e}{_ : isEnabled d e}{b} → WidgetEdit d (CheckBox e b)
+  click          : ∀ {s} → WidgetEdit I (Button enabled s)
+  setLabel       : ∀ {n} → String → WidgetEdit O (Label n)
+  setEntry       : ∀ {d e}{_ : isEnabled d e}{s n c v} → String → WidgetEdit d (Entry e s n c v)
+  select         : ∀ {d e}{_ : isEnabled d e}{n}{vs : Vec String n}{f} → Fin n → WidgetEdit d (ComboBox e vs f)
+  toggleEnable   : ∀ {w}{e : isJust (isInput w)} → WidgetEdit O w
+  toggleValidity : ∀ {e s n c v} → WidgetEdit O (Entry e s n c v)
+  replaceBy      : ∀ {a} → Widget → WidgetEdit O a
+  modLeft        : ∀ {d dir a b} → WidgetEdit d a → WidgetEdit d (Container dir a b)
+  modRight       : ∀ {d dir a b} → WidgetEdit d b → WidgetEdit d (Container dir a b)
+  addToLeft addToRight    : ∀ {a} → Direction → Widget → WidgetEdit O a
+  removeLeft removeRight  : ∀ {dir a b} → WidgetEdit O (Container dir a b)
+  _∙_         : ∀ {a} → (p : WidgetEdit O a) → WidgetEdit O ⟪ p ⟫ → WidgetEdit O a
 
 ⟪ replaceBy x ⟫ = x
-⟪ modLeft  {d} {a} {b} p ⟫ = ⟪ p ⟫ ∥ b
-⟪ modRight {d} {a} {b} p ⟫ = a ∥ ⟪ p ⟫
-⟪ toggle {d} {b} ⟫ = Checkbox (not b)
-⟪ click {s} ⟫ = Button s
+⟪ modLeft  {d} {dir} {a} {b} p ⟫ = Container dir ⟪ p ⟫ b
+⟪ modRight {d} {dir} {a} {b} p ⟫ = Container dir a ⟪ p ⟫
+⟪ toggle {d} {e} {_} {b} ⟫ = CheckBox e (not b)
+⟪ select {d} {e} {_} {n} {vs} i ⟫ = ComboBox e vs i
+⟪ setEntry {d} {e} {_} {s} {n} {_} {v} c ⟫ = Entry e s n c v
+⟪ toggleValidity {e} {s} {n} {c} {v} ⟫ = Entry e s n c (not v)
+⟪ click {s} ⟫ = Button enabled s
 ⟪ setLabel l ⟫ = Label l
-⟪ setEntry l ⟫ = Entry l
-⟪ addToLeft  {r} l ⟫ = l ∥ r
-⟪ addToRight {l} r ⟫ = l ∥ r
-⟪ removeLeft  {l} {r} ⟫ = r
-⟪ removeRight {l} {r} ⟫ = l
+⟪ toggleEnable {w} {e} ⟫ with isInput w | e
+... | just (_ , w') | tt = w'
+... | nothing | ()
+⟪ addToLeft  {r} dir l ⟫ = Container dir l r
+⟪ addToRight {l} dir r ⟫ = Container dir l r
+⟪ removeLeft  {_} {l} {r} ⟫ = r
+⟪ removeRight {_} {l} {r} ⟫ = l
 ⟪ p ∙ q ⟫ = ⟪ q ⟫
-⟪ same {a} ⟫ = a
-⟪ a ∥ b ⟫ = ⟪ a ⟫ ∥ ⟪ b ⟫
 
 -- Editable widgets structure
 Widgets : Patchable
 Widgets .Document = I/O × Widget
-Widgets .PatchOf (I , s) = Maybe (WidgetEdit I s)  -- TODO: remove Maybe
-Widgets .PatchOf (O , s) = WidgetEdit O s
-Widgets .patch {I , _} (just p) = O , ⟪ p ⟫
-Widgets .patch {I , d} nothing = O , d
-Widgets .patch {O , _} p = I , ⟪ p ⟫
+Widgets .PatchOf (d , s) = Maybe (WidgetEdit d s)
+Widgets .patch {d , doc} p = opposite d , maybe doc ⟪_⟫ p
 
 pw : I/O → Widget → Tree
 pw d g = patches Widgets (d , g)
 
-button : ∀ {s} d → flipᵈ d IT (pw d (Button s)) (flipᵈ d alter' (Maybe ⊤) ⊤)
-button I .step nothing  .step = nothing , button O
-button I .step (just click) .step = just _ , button O
-button O .step _ .step = same , button I
+-- GUI component (reactive widget)
+WComp' : (d : I/O)(w : Widget) → Tree → Set
+WComp' d w t = ⟨ d ⟩ IT (pw d w) t
 
-checkbox : ∀ {b} d → flipᵈ d IT (pw d (Checkbox b)) (flipᵈ d alter' (Maybe Bool) (Maybe Bool))
-checkbox I .step nothing  .step = nothing , checkbox O
-checkbox {b} I .step (just toggle) .step = just (not b) , checkbox O
-checkbox O .step nothing .step = same , checkbox I
-checkbox {true} O .step (just false) .step = toggle , checkbox I
-checkbox {false} O .step (just true) .step = toggle , checkbox I
-checkbox O .step (just _) .step = same , checkbox I
+WComp : (d : I/O)(w : Widget)(A B : Set) → Set
+WComp d w A B = WComp' d w (⟨ d ⟩ Sig A B)
 
-label : ∀ {n} d → flipᵈ d IT (pw d (Label n)) (flipᵈ d alter' ⊤ (Maybe String))
-label I .step nothing  .step = _ , label O
-label I .step (just ())
-label O .step nothing .step = same , label I
-label O .step (just m) .step = setLabel m , label I
-
-entry : ∀ {s} d → flipᵈ d IT (pw d (Entry s)) (flipᵈ d alter' (Maybe String) (Maybe String))
-entry I .step nothing  .step = nothing , entry O
-entry I .step (just (setEntry s)) .step = just s , entry O
-entry O .step nothing .step = same , entry I
-entry O .step (just s) .step = setEntry s , entry I
-
-nextTo : ∀ {a b} d → flipᵈ d IT (pw d (a ∥ b)) (pw d a ×ᵀ pw d b)
-nextTo I .step nothing .step = (nothing , nothing) , nextTo O
-nextTo I .step (just (modLeft e))  .step = (just e , nothing) , nextTo O
-nextTo I .step (just (modRight e)) .step = (nothing , just e) , nextTo O
-nextTo O .step (x , y) .step = x ∥ y , nextTo I
-
-_||_ : ∀ {r s a b} → IT (pw I a) r → IT (pw I b) s → IT (pw I (a ∥ b)) (r ×ᵀ s)
-p || q = nextTo I ∘ᵀ (p ,ᵗ q)
-
-ease : ∀ {w} → CoEdit I Widgets (I , w) → CoEdit I Widgets (I , w)
-ease b .step nothing .step = same , (ease b)
-ease b .step (just i) .step with b .step (just i) .step
-... | x , y = x , (ease y)
+WC : (p : Tree) → Set
+WC p = Σ Widget λ w → WComp' I w p
 
 -- GUI program
-GUI : Set₁
-GUI = Σ Widget λ w → CoEdit I Widgets (I , w)
+GUI = WC NoSig
 
-ease' : GUI → GUI
-ease' (_ , x) = _ , ease x
+-- `processMain` is automatically applied on `mainWidget` by the run time system
+processMain : ∀ {A B} → WC (Sig A B) → Σ Widget λ w → Agent I (pw I w)
+processMain (w , x) = (w , mapAgent {I} (x ∘ᵀ noInput ∘ᵀ noOutput) (arr id))
 
-infixr 10 _<>_
-_<>_ : GUI → GUI → GUI
-(a , b) <> (c , d) = a ∥ c , map' (nextTo I) (b ,ᵀ d)
+-- enforcing  no input ⇒ no output
+ease : ∀ {d w A B} → WComp d w A B → WComp d w A B
+ease {I} b .step nothing .step = nothing , λ where .step x .step → nothing , ease {I} b
+ease {I} b .step (just z) .step with b .step (just z) .step
+... | x , y = x , ease {O} y
+ease {O} b .step x .step with b .step x .step
+... | c , d = c , ease {I} d
+
+ease' : ∀ {A B} → WC (Sig A B) → WC (Sig A B)
+ease' (_ , x) = _ , ease {I} x
+
+_∘ʷ_ : ∀ {p q} → WC p → IT p q → WC q
+(_ , x) ∘ʷ y = (_ , x ∘ᵀ y)
+
+
+----------------------------------------------------------
+
+button : ∀ {s} d → WComp d (Button enabled s) ⊤ ⊥
+button I .step nothing  .step = nothing , button O
+button I .step (just click) .step = just _ , button O
+button O .step _ .step = nothing , button I
+
+button' : String → WC (OutSig ⊤)
+button' s = _ , button {s} I
+
+checkbox : ∀ {b} d → WComp d (CheckBox enabled b) Bool Bool
+checkbox I .step nothing  .step = nothing , checkbox O
+checkbox {b} I .step (just toggle) .step = just (not b) , checkbox O
+checkbox O .step nothing .step = nothing , checkbox I
+checkbox {b} O .step (just b') .step with b == b'
+... | true = nothing , checkbox I
+... | false = just toggle , checkbox I
+
+checkbox' : Bool → WC (BiSig Bool)
+checkbox' b = _ , checkbox {b} I
+
+comboBox : ∀ {n}{vs : Vec String n}{i} d → WComp d (ComboBox enabled vs i) (Fin n) (Fin n)
+comboBox I .step nothing  .step = nothing , comboBox O
+comboBox I .step (just (select i)) .step = just i , comboBox O
+comboBox O .step nothing .step = nothing , comboBox I
+comboBox O .step (just i) .step = just (select i) , comboBox I
+
+comboBox' : ∀ {n}(vs : Vec String n)(i : Fin n) → WC (Sig (Fin n) (Fin n))
+comboBox' vs i = _ , comboBox {vs = vs}{i = i} I
+
+label : ∀ {n} d → WComp d (Label n) ⊥ String
+label I .step nothing  .step = nothing , label O
+label I .step (just ())
+label O .step nothing .step = nothing , label I
+label O .step (just m) .step = just (setLabel m) , label I
+
+label' : String → WC (InSig String)
+label' n = _ , label {n} I
+
+label'' = λ n → label' n -- ∘ʷ discard
+
+-- todo: refactoring (use less cases)
+entry : Bool → ∀ {en s n c v} d → WComp' d (Entry en s n c v) (⟨ d ⟩ Sig String (Maybe String) ×ᵀ ⟨ d ⟩ Sig ⊥ ⊤)
+entry _ I .step nothing .step = (nothing , nothing) , entry false O
+entry _ I .step (just (setEntry s)) .step = (just s , nothing) , entry true O
+entry v' {v = v} O .step (ii , td) .step with td | ii | v | v'
+... | nothing | nothing        | false | true = just toggleValidity , entry false I
+... | nothing | just nothing   | true  | _    = just toggleValidity , entry false I
+... | nothing | just (just ss) | true  | _    = just (setEntry ss) , entry false I
+... | nothing | just (just ss) | false | _    = just (setEntry ss ∙ toggleValidity) , entry false I
+... | nothing | _              | _     | _    = nothing , entry false I
+... | just _  | nothing        | false | true = just (toggleEnable ∙ toggleValidity) , entry false I
+... | just _  | just nothing   | true  | _    = just (toggleEnable ∙ toggleValidity) , entry false I
+... | just _  | just (just ss) | true  | _    = just (toggleEnable ∙ setEntry ss) , entry false I
+... | just _  | just (just ss) | false | _    = just (toggleEnable ∙ setEntry ss ∙ toggleValidity) , entry false I
+... | just _  | _              | _     | _    = just toggleEnable , entry false I
+
+entryF : ℕ → Abled → String → WC (Sig String (Maybe String) ×ᵀ InSig ⊤)
+entryF len en name = _ , entry false {en} {len} {name} {""} {true} I
+
+container' : ∀ {dir a b} d → WComp' d (Container dir a b) (pw d a ×ᵀ pw d b)
+container' I .step nothing .step = (nothing , nothing) , container' O
+container' I .step (just (modLeft e))  .step = (just e , nothing) , container' O
+container' I .step (just (modRight e)) .step = (nothing , just e) , container' O
+container' O .step (nothing , nothing) .step = nothing , container' I
+container' O .step (just x , nothing) .step = just (modLeft x) , container' I
+container' O .step (nothing , just y) .step = just (modRight y) , container' I
+container' O .step (just x , just y) .step = just (modLeft x ∙ modRight y) , container' I
+
+container : ∀ {r s a b} → (dir : Direction) → WComp' I a r → WComp' I b s → WComp' I  (Container dir a b) (r ×ᵀ s)
+container _ p q = container' I ∘ᵀ (p ,ᵗ q)
+
+fc : Direction → ∀ {p C D} → WC p → WC (Sig C D) → WC p
+fc dir (_ , b) (_ , d) = _ , container' {dir} I ∘ᵀ ({-ease {I}-} b ,ᵗ ease {I} d) ∘ᵀ fstSig
+
+infixr 3 _<->_
+infixr 4 _<|>_
+
+_<|>_ = fc horizontal
+_<->_ = fc vertical
+
+infix 5 _⟦_⟧_
+_⟦_⟧_ : ∀ {p q r} → WC p → IT (p ×ᵀ q) r → WC q → WC r
+(_ , b) ⟦ t ⟧ (_ , d) = _ , container' {horizontal} I ∘ᵀ (b ,ᵗ d) ∘ᵀ t
+
+entry'' : Abled → ℕ → String → WC (Sig String (Maybe String) ×ᵀ InSig ⊤)
+entry'' en len name = entryF len en name ⟦ fstSig ⟧ label' name
+
+entry' = λ len name → entry'' enabled len name ∘ʷ fstSig
+
+addLabel : ∀ {p} → (s : String) → WC p → WC p
+addLabel s x = x ⟦ fstSig ⟧ label'' s
 
 ---------------------------------------------------------------------------------------------------------------
 
-counter = λ n → map' ((button {"+1"} I || label {showNat n} I) ∘ᵀ entangle _ I)
-                     (maybefy (arr (const (suc zero)) ∘ᵗ accum _+_ n ∘ᵗ arr showNat))
+counter = λ n → label' (showNat n) ⟦ swapIT ∘ᵀ enta (arr (const 1) ∘ᵗ accum _+_ n ∘ᵗ arr showNat) ⟧ button' "Count"
 
-counter' = λ f b n → map' ((checkbox {b} I || label {showNat n} I) ∘ᵀ entangle nothing I)
-                     (maybefy (arr f ∘ᵗ accum _+_ n ∘ᵗ arr showNat))
+counter' = λ f b n → checkbox' b ∘ʷ noInput ⟦ enta (arr f ∘ᵗ accum _+_ n ∘ᵗ arr showNat) ⟧ label' (showNat n)
 
-_*2 = λ x → ease' x <> ease' x
+floatEntry = λ s → entry' 4 s ∘ʷ prismIT floatPrism
+dateEntry = λ en s → entry'' en 4 s ∘ʷ (prismIT floatPrism ,ᵗ idIT)
 
-mainWidget = ((_ , counter zero)
-           <> (_ , counter' (if_then suc zero else zero) false zero)
-           <> (_ , counter' (λ _ → suc zero) false zero)
-           <> (_ , counter' (if_then zero else suc zero) false zero)
-           <> (_ , map' ((entry {""} I || label {""} I) ∘ᵀ entangle nothing I) (maybefy (arr id)))
-             ) *2 *2 *2 *2 *2
+showDates : (Float × Float) → String
+showDates (a , b) = primStringAppend (showFloat a) (primStringAppend " -- " (showFloat b))
+
+mainWidget =
+       label' "count clicks:"
+  <|>  counter 0
+
+  <->  label' "count checks:"
+  <|>  counter' (if_then 1 else 0) false 0
+
+  <->  label' "count checks and unchecks:"
+  <|>  counter' (const 1)          false 0
+
+  <->  label' "count unchecks:"
+  <|>  counter' (if_then 0 else 1) false 0
+
+  <->  label' "copy input to label:"
+  <|>  entry' 10 "" ∘ʷ noInput ⟦ enta (arr id) ⟧ label' ""
+
+  <->  label' "converter:"
+  <|>  floatEntry "Celsius" ⟦ entaBi (isoBi (plusIso 1.8) ∘ᵇ isoBi (mulIso 32.0)) ⟧ floatEntry "Fahrenheit"
+
+  <->  label' "flight booker (unfinished):"
+  <|>  ((comboBox' ("one-way" ∷ "return" ∷ []) zero
+            ⟦ (mkIT' (arr ( maybe nothing (const (just _))  -- mapMaybe (const _) cannot be used because Agda bug #3380
+                          )) (arr id) ,ᵗ (assocIT {O} ∘ᵀ swapIT))
+            ∘ᵀ assocIT {O}
+            ∘ᵀ (swapIT ∘ᵀ entangle ,ᵗ joinSig {I} 0.0 0.0) ∘ᵀ (swapIT ∘ᵀ fstSig)
+            ⟧
+       (dateEntry enabled "start date" ∘ʷ fstSig ⟦ idIT ⟧ dateEntry disabled "return date")) ∘ʷ noInput)
+            ⟦  {-(isoIT (showDates) (const nothing)  ,ᵗ idIT) ∘ᵀ entangle-} enta (arr showDates)
+            ⟧
+       (label' "")
 
