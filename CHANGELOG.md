@@ -2,6 +2,7 @@
 # Sun Nov 11
 
 - you can try the application online now (see README)
+- more documentation in the README
 - temperature converter example added
 - unfinished flight booker example added
 - a bit more documentation in rts.js
