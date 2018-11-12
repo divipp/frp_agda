@@ -12,7 +12,7 @@ This repository is a work-in-progress attempt for defining composable GUI progra
 
 -   [Try little examples online](https://people.inf.elte.hu/divip/frp_agda/index.html)
 
--   How to compile with Agda 2.5.4.1:
+-   How to compile with Agda 2.6.0 (development version):
 
         agda --js --no-main Reactive.agda
 

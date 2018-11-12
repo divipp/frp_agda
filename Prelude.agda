@@ -91,20 +91,19 @@ data Vec (A : Set) : ℕ → Set where
   []  : Vec A 0
   _∷_ : ∀ {n} → A → Vec A n → Vec A (suc n)
 
+{-# BUILTIN STRING String #-}
 postulate
-  String : Set
   primStringAppend   : String → String → String
   primStringEquality : String → String → Bool
   primShowString     : String → String
   showNat : ℕ → String
-{-# BUILTIN STRING String #-}
 {-# COMPILE JS primStringAppend = function(x) { return function(y) { return x + y; }; } #-}
 {-# COMPILE JS primStringEquality = function(x) { return function(y) { return x === y; }; } #-}
 {-# COMPILE JS primShowString = function(x) { return JSON.stringify(x); } #-}
 {-# COMPILE JS showNat = function(x) { return JSON.stringify(x); } #-}
 
+{-# BUILTIN FLOAT Float #-}
 postulate
-  Float : Set
   parseFloat : String → Maybe Float
   primFloatShow     : Float → String
   showFloat         : Float → String
@@ -112,7 +111,6 @@ postulate
   minusFloat        : Float → Float → Float
   mulFloat          : Float → Float → Float
   divFloat          : Float → Float → Float
-{-# BUILTIN FLOAT Float #-}
 {-# COMPILE JS parseFloat = function(x) { return myParseFloat(x); } #-}
 {-# COMPILE JS showFloat = function(x) { return JSON.stringify(x); } #-}
 {-# COMPILE JS plusFloat = function(x) { return function(y) { return x + y; };} #-}
