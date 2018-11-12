@@ -1,13 +1,15 @@
 {-# OPTIONS --type-in-type #-}
 module Prelude where
 
-id : {A : Set} → A → A
+variable S T A B C D : Set
+
+id : A → A
 id x = x
 
-const : {A B : Set} → A → B → A
+const : A → B → A
 const x _ = x
 
-flip : {A B C : Set} → (A → B → C) → B → A → C
+flip : (A → B → C) → B → A → C
 flip f x y = f y x
 
 data ⊥ : Set where
@@ -30,19 +32,19 @@ false == false = true
 true == true = true
 false == true = false
 
-if_then_else_ : {A : Set} → Bool → A → A → A
+if_then_else_ : Bool → A → A → A
 if true  then x else y = x
 if false then x else y = y
 
-data _⊎_ (A B : Set) : Set where
+data _⊎_ A B : Set where
   inj₁ : A → A ⊎ B
   inj₂ : B → A ⊎ B
 
-Π : (A : Set) → (A → Set₁) → Set₁
+Π : (A : Set) → (A → Set) → Set
 Π A B = (a : A) → B a
 
 infix 4 _,_
-record Σ (A : Set) (B : A → Set₁) : Set₁ where
+record Σ A (B : A → Set) : Set where
   inductive
   constructor _,_
   field
@@ -57,11 +59,11 @@ data Maybe (A : Set) : Set where
   nothing : Maybe A
   just : A → Maybe A
 
-maybe : {A B : Set} → B → (A → B) → Maybe A → B
+maybe : B → (A → B) → Maybe A → B
 maybe b f nothing = b
 maybe b f (just x) = f x
 
-mapMaybe : {A B : Set} → (A → B) → Maybe A → Maybe B
+mapMaybe : (A → B) → Maybe A → Maybe B
 mapMaybe f = maybe nothing λ a → just (f a)
 
 data ℕ : Set where
@@ -75,13 +77,15 @@ _+_ : ℕ → ℕ → ℕ
 zero  + m = m
 suc n + m = suc (n + m)
 
+variable n : ℕ
+
 {-# BUILTIN NATPLUS _+_ #-}
 
 data Fin : ℕ → Set where
-  zero : {n : ℕ} → Fin (suc n)
-  suc : {n : ℕ} (i : Fin n) → Fin (suc n)
+  zero : Fin (suc n)
+  suc  : (i : Fin n) → Fin (suc n)
 
-finToNat : ∀ {n} → Fin n → ℕ
+finToNat : Fin n → ℕ
 finToNat zero = zero
 finToNat (suc x) = suc (finToNat x)
 
@@ -89,7 +93,7 @@ infixr 5 _∷_
 
 data Vec (A : Set) : ℕ → Set where
   []  : Vec A 0
-  _∷_ : ∀ {n} → A → Vec A n → Vec A (suc n)
+  _∷_ : A → Vec A n → Vec A (suc n)
 
 {-# BUILTIN STRING String #-}
 postulate
@@ -133,7 +137,7 @@ Lens S T A B = S → A × (B → T)
 Prism : (S T A B : Set) → Set
 Prism S T A B = (S → A ⊎ T) × (B → T)
 
-prismToLens : ∀ {S T A B} → Prism S T A B → Lens (Maybe S) (Maybe T) (Maybe A) (Maybe B)
+prismToLens : Prism S T A B → Lens (Maybe S) (Maybe T) (Maybe A) (Maybe B)
 prismToLens (p1 , p2) nothing = nothing , mapMaybe p2
 prismToLens (p1 , p2) (just s) with p1 s
 ... | inj₁ a = just a , mapMaybe p2

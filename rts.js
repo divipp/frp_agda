@@ -44,12 +44,6 @@ const domRoot = document.getElementById("root");
 function toFin (x) {
   return (x === 0 ? exports["Fin"]["zero"]("null1") : exports["Fin"]["suc"]("null2")(toFin(x-1)) );
 };
-// marshalling function from Agda Bool to JS Bool
-function fromBool (x) { return x(
-  {"true":  function () {return true;}
-  ,"false": function () {return false;}
-  });
-};
 
 // conversion from Agda Widget type to DOM elements
 // `dir` is either 'horizontal' or 'vertical'; it is used only in the "Container" case
@@ -82,7 +76,7 @@ function makeWidget(dir, widget_description) {
       res.setAttribute("onchange", "toggle_event(this)");
       setEnabled(a);
       }
-    ,"ComboBox": function (a, _, vs, sel) {
+    ,"ComboBox": function (_, a, vs, sel) {
       res = document.createElement("select");
       fillComboBox(vs);
       res.selectedIndex = exports["finToNat"](sel);
@@ -101,7 +95,7 @@ function makeWidget(dir, widget_description) {
       res.setAttribute("size", size);
       res.setAttribute("name", name);
       res.value = contents;
-      if (!fromBool(valid)) { res.style['background-color'] = 'red'; };
+      valid({"invalid": function (){ res.style['background-color'] = 'red'; }, "valid": function (){}});
       setEnabled(a);
       }
     ,"Container": function (newd,le,ri) {
