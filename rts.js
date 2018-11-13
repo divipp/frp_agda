@@ -15,7 +15,7 @@ function require(_) { return exports; }
 
 // These primitive functions are directly called in Agda generated JS code
 // `exports.primIntegerFromString("0")` is also used to fill in erased arguments by Agda
-exports.primIntegerFromString           = function(x)   { return parseInt(x); };
+exports.primIntegerFromString           = function(x)   { return parseInt(x, 10); };
 exports.primSeq                         = function(x,y) { return y; };
 exports.uprimIntegerPlus                = function(x,y) { return x + y; };
 exports.uprimIntegerMinus               = function(x,y) { return x - y; };
