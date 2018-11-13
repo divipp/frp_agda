@@ -1,4 +1,4 @@
-{-# OPTIONS --type-in-type #-}
+{-# OPTIONS --type-in-type --no-universe-polymorphism #-}
 module Reactive where
 
 open import Prelude
@@ -29,17 +29,15 @@ alter : Tree → Tree → Tree
 alter p q .Branch = p .Branch
 alter p q .child hp = alter q (p .child hp)
 
-alter' : Set → Set → Tree
-alter' A B = alter (constᵀ A) (constᵀ B)
+alter' = λ A B → alter (constᵀ A) (constᵀ B)
 
 -- signals
-Sig : (A B : Set) → Tree
-Sig A B = alter' (Maybe A) (Maybe B)
+Sig = λ A B → alter' (Maybe A) (Maybe B)
 
-NoSig = Sig ⊥ ⊥
+NoSig  = Sig ⊥ ⊥
 OutSig = λ A → Sig A ⊥
-InSig = λ A → Sig ⊥ A
-BiSig = λ A → Sig A A
+InSig  = λ A → Sig ⊥ A
+BiSig  = λ A → Sig A A
 
 {-
 p:  P₁    P₂ -> P₃    P₄  ...
@@ -73,25 +71,12 @@ union2mb p q .child (just (inj₂ qh)) with q .child qh
 union2mb p q .child nothing .Branch = ⊤
 union2mb p q .child nothing .child _ = union2mb p q
 
----------------------------------------
-
--- patchable structure
-record Patchable : Set where
-  constructor Patch'
-  field
-    Document : Set
-    PatchOf : Document → Set
-    patch : {s : Document} → PatchOf s → Document
-
-open Patchable
-
-patches : (p : Patchable) → Document p → Tree
-patches p s .Branch = p .PatchOf s
-patches p s .child r = patches p (p .patch r)
-
 -----------------------------
 
 data I/O : Set where I O : I/O   -- input and output phases
+
+variable i/o : I/O
+variable p q r s : Tree
 
 opposite : I/O → I/O
 opposite I = O
@@ -114,9 +99,6 @@ record Agent (i/o : I/O) (p : Tree) : Set where
 
 open Agent
 
-variable i/o : I/O
-variable p q r s : Tree
-
 _,ᵀ_ : Agent i/o p → Agent i/o q → Agent i/o (p ×ᵀ q)
 _,ᵀ_ {I} a b .step (k , l) = a .step k ,ᵀ b .step l
 _,ᵀ_ {O} a b .step with a .step | b .step
@@ -128,12 +110,10 @@ _∘ᵗ_ : Agent I (alter p q) → Agent I (alter q r) → Agent I (alter p r)
 ... | rh , at = rh , bt ∘ᵗ at
 
 -- stream processors
-SP : Set → Set → Set
-SP A B = Agent I (alter' A B)
+SP = λ A B → Agent I (alter' A B)
 
-SPM : Set → Set → Set
 -- same as  Agent I (Sig A B)
-SPM A B = SP (Maybe A) (Maybe B)
+SPM = λ A B → SP (Maybe A) (Maybe B)
 
 arr : (A → B) → SP A B
 arr f .step x .step = f x , arr f
@@ -148,8 +128,7 @@ maybefy f .step (just a) .step with f .step a .step
 ... | x , y = just x , maybefy y
 
 -- synchronous interaction transformers
-IT : (p q : Tree) → Set
-IT p q = Agent I (merge p q)
+IT = λ p q → Agent I (merge p q)
 
 mapAgent : ⟨ i/o ⟩ IT q p → Agent i/o p → Agent i/o q
 mapAgent {I} l i .step hq with l .step hq .step
@@ -199,11 +178,9 @@ mkIT {I} a .step x .step = nothing , mkIT {O} (a .step x)
 mkIT {O} a .step _ .step with a .step
 ... | b , c = b , mkIT {I} c
 
-constIT : (S T A B : Set) → Set
-constIT S T A B = IT (alter' S T) (alter' A B)
+constIT = λ S T A B → IT (alter' S T) (alter' A B)
 
-constITM : (S T A B : Set) → Set
-constITM S T A B = IT (Sig S T) (Sig A B)
+constITM = λ S T A B → IT (Sig S T) (Sig A B)
 
 lensIT : Lens S T A B → constIT S T A B
 lensIT k .step s .step with k s
@@ -220,8 +197,7 @@ isoIT : (S → A) → (B → T) → constIT S T A B
 isoIT f g = lensIT λ x → (f x) , g
 
 -- bidirectional connection
-Bi : (p q : Tree) → Set
-Bi p q = Agent I (union2 p q)
+Bi = λ p q → Agent I (union2 p q)
 
 _∘ᵇ_ : Bi p q → Bi q r → Bi p r
 (a ∘ᵇ b) .step (inj₁ x) .step with a .step (inj₁ x) .step
@@ -263,14 +239,14 @@ data Direction : Set where horizontal vertical : Direction
 data Abled     : Set where enabled disabled : Abled
 data Validity  : Set where valid invalid : Validity
 
-variable fin : Fin _
-variable vec : Vec _ _
-variable checked : Bool
-variable size : ℕ
+variable fin      : Fin _
+variable vec      : Vec _ _
+variable checked  : Bool
+variable size     : ℕ
 variable name str : String
-variable en : Abled
-variable dir : Direction
-variable val : Validity
+variable en       : Abled
+variable dir      : Direction
+variable val      : Validity
 
 oppositeᵉ : Abled → Abled
 oppositeᵉ enabled = disabled
@@ -298,9 +274,9 @@ data Widget : Set where
 variable w w₁ w₂ : Widget
 
 isInput : Widget → Maybe (Abled × Widget)
-isInput (Button e x) = just (e , Button (oppositeᵉ e) x)
-isInput (CheckBox e x) = just (e , CheckBox (oppositeᵉ e) x)
-isInput (ComboBox e ss i) = just (e , ComboBox (oppositeᵉ e) ss i)
+isInput (Button e x)       = just (e , Button (oppositeᵉ e) x)
+isInput (CheckBox e x)     = just (e , CheckBox (oppositeᵉ e) x)
+isInput (ComboBox e ss i)  = just (e , ComboBox (oppositeᵉ e) ss i)
 isInput (Entry e n s s' v) = just (e , Entry (oppositeᵉ e) n s s' v)
 isInput _ = nothing
 
@@ -328,41 +304,35 @@ data WidgetEdit  where
   _∙_            : (p : WidgetEdit O w) → WidgetEdit O ⟪ p ⟫ → WidgetEdit O w
 
 ⟪ replaceBy x ⟫ = x
-⟪ modLeft  {d} {dir} {a} {b} p ⟫ = Container dir ⟪ p ⟫ b
-⟪ modRight {d} {dir} {a} {b} p ⟫ = Container dir a ⟪ p ⟫
-⟪ toggle {checked = b} {en = en} ⟫ = CheckBox en (not b)
+⟪ modLeft  {dir = dir} {w₂ = w₂} p ⟫ = Container dir ⟪ p ⟫ w₂
+⟪ modRight {dir = dir} {w₁ = w₁} p ⟫ = Container dir w₁ ⟪ p ⟫
+⟪ toggle {checked = b} {en = en} ⟫   = CheckBox en (not b)
 ⟪ select {en = en} {vec = vec} fin ⟫ = ComboBox en vec fin
 ⟪ setEntry {_} {size} {name} {_} {en} {val} {_} str ⟫ = Entry en size name str val
-⟪ toggleValidity {size} {name} {str} {en} {val} ⟫ = Entry en size name str (oppositeᵛ val)
-⟪ click {s} ⟫ = Button enabled s
+⟪ toggleValidity {size} {name} {str} {en} {val} ⟫     = Entry en size name str (oppositeᵛ val)
+⟪ click {s} ⟫  = Button enabled s
 ⟪ setLabel l ⟫ = Label l
 ⟪ toggleEnable {w} {e} ⟫ with isInput w | e
 ... | just (_ , w') | tt = w'
 ... | nothing | ()
-⟪ addToLeft  {r} dir l ⟫ = Container dir l r
-⟪ addToRight {l} dir r ⟫ = Container dir l r
-⟪ removeLeft  {_} {l} {r} ⟫ = r
-⟪ removeRight {_} {l} {r} ⟫ = l
+⟪ addToLeft  {r} dir w ⟫ = Container dir w r
+⟪ addToRight {l} dir w ⟫ = Container dir l w
+⟪ removeLeft  {w₂ = w₂} ⟫ = w₂
+⟪ removeRight {w₁ = w₁} ⟫ = w₁
 ⟪ p ∙ q ⟫ = ⟪ q ⟫
 
--- Editable widgets structure
-Widgets : Patchable
-Widgets .Document = I/O × Widget
-Widgets .PatchOf (d , s) = Maybe (WidgetEdit d s)
-Widgets .patch {d , doc} p = opposite d , maybe doc ⟪_⟫ p
+---------------------------------------
 
 pw : I/O → Widget → Tree
-pw d g = patches Widgets (d , g)
+pw i/o w .Branch = Maybe (WidgetEdit i/o w)
+pw i/o w .child e = pw (opposite i/o) (maybe w ⟪_⟫ e)
 
 -- GUI component (reactive widget)
-WComp' : (d : I/O)(w : Widget) → Tree → Set
-WComp' d w t = ⟨ d ⟩ IT (pw d w) t
+WComp' = λ i/o w p → ⟨ i/o ⟩ IT (pw i/o w) p
 
-WComp : (d : I/O)(w : Widget)(A B : Set) → Set
-WComp d w A B = WComp' d w (⟨ d ⟩ Sig A B)
+WComp = λ i/o w A B → WComp' i/o w (⟨ i/o ⟩ Sig A B)
 
-WC : (p : Tree) → Set
-WC p = Σ Widget λ w → WComp' I w p
+WC = λ p → Σ Widget λ w → WComp' I w p
 
 -- GUI program
 GUI = WC NoSig

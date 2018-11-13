@@ -1,4 +1,4 @@
-{-# OPTIONS --type-in-type #-}
+{-# OPTIONS --type-in-type --no-universe-polymorphism #-}
 module Prelude where
 
 variable S T A B C D : Set
@@ -40,20 +40,18 @@ data _⊎_ A B : Set where
   inj₁ : A → A ⊎ B
   inj₂ : B → A ⊎ B
 
-Π : (A : Set) → (A → Set) → Set
-Π A B = (a : A) → B a
+Π = λ (A : Set) (P : A → Set) → (a : A) → P a
 
 infix 4 _,_
-record Σ A (B : A → Set) : Set where
+record Σ A (P : A → Set) : Set where
   inductive
   constructor _,_
   field
     proj₁ : A
-    proj₂ : B proj₁
+    proj₂ : P proj₁
 open Σ public
 
-_×_ : Set → Set → Set
-A × B = Σ A λ _ → B
+_×_ = λ A B → Σ A λ _ → B
 
 data Maybe (A : Set) : Set where
   nothing : Maybe A
@@ -101,10 +99,10 @@ postulate
   primStringEquality : String → String → Bool
   primShowString     : String → String
   showNat : ℕ → String
-{-# COMPILE JS primStringAppend = function(x) { return function(y) { return x + y; }; } #-}
+{-# COMPILE JS primStringAppend   = function(x) { return function(y) { return x + y; }; } #-}
 {-# COMPILE JS primStringEquality = function(x) { return function(y) { return x === y; }; } #-}
-{-# COMPILE JS primShowString = function(x) { return JSON.stringify(x); } #-}
-{-# COMPILE JS showNat = function(x) { return JSON.stringify(x); } #-}
+{-# COMPILE JS primShowString     = function(x) { return JSON.stringify(x); } #-}
+{-# COMPILE JS showNat            = function(x) { return JSON.stringify(x); } #-}
 
 {-# BUILTIN FLOAT Float #-}
 postulate
@@ -116,26 +114,21 @@ postulate
   mulFloat          : Float → Float → Float
   divFloat          : Float → Float → Float
 {-# COMPILE JS parseFloat = function(x) { return myParseFloat(x); } #-}
-{-# COMPILE JS showFloat = function(x) { return JSON.stringify(x); } #-}
-{-# COMPILE JS plusFloat = function(x) { return function(y) { return x + y; };} #-}
+{-# COMPILE JS showFloat  = function(x) { return JSON.stringify(x); } #-}
+{-# COMPILE JS plusFloat  = function(x) { return function(y) { return x + y; };} #-}
 {-# COMPILE JS minusFloat = function(x) { return function(y) { return x - y; };} #-}
-{-# COMPILE JS mulFloat = function(x) { return function(y) { return x * y; };} #-}
-{-# COMPILE JS divFloat = function(x) { return function(y) { return x / y; };} #-}
+{-# COMPILE JS mulFloat   = function(x) { return function(y) { return x * y; };} #-}
+{-# COMPILE JS divFloat   = function(x) { return function(y) { return x / y; };} #-}
 
-Iso : (S T A B : Set) → Set
-Iso S T A B = (S → A) × (B → T)
+Iso   = λ (S T A B : Set) → (S → A) × (B → T)
+Lens  = λ (S T A B : Set) → S → A × (B → T)
+Prism = λ (S T A B : Set) → (S → A ⊎ T) × (B → T)
 
 plusIso : Float → Iso Float Float Float Float
 plusIso x = plusFloat x , λ y → minusFloat y x
 
 mulIso : Float → Iso Float Float Float Float
 mulIso x = mulFloat x , λ y → divFloat y x
-
-Lens : (S T A B : Set) → Set
-Lens S T A B = S → A × (B → T)
-
-Prism : (S T A B : Set) → Set
-Prism S T A B = (S → A ⊎ T) × (B → T)
 
 prismToLens : Prism S T A B → Lens (Maybe S) (Maybe T) (Maybe A) (Maybe B)
 prismToLens (p1 , p2) nothing = nothing , mapMaybe p2
