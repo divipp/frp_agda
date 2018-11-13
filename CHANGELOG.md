@@ -1,4 +1,10 @@
 
+# Tue Nov 13
+
+- more documentation in the README
+- updated to Agda 2.6.0 (development version)
+- use generalizable variables in Agda code
+
 # Sun Nov 11
 
 - you can try the application online now (see README)
