@@ -508,7 +508,7 @@ mainWidget =
   <|>  entry' 10 "" ∘ʷ noInput ⟦ enta (arr id) ⟧ label' ""
 
   <->  label' "converter:"
-  <|>  floatEntry "Celsius" ⟦ entaBi (isoBi (plusIso 1.8) ∘ᵇ isoBi (mulIso 32.0)) ⟧ floatEntry "Fahrenheit"
+  <|>  floatEntry "Celsius" ⟦ entaBi (isoBi (mulIso 1.8) ∘ᵇ isoBi (plusIso 32.0)) ⟧ floatEntry "Fahrenheit"
 
   <->  label' "flight booker (unfinished):"
   <|>  ((comboBox' ("one-way" ∷ "return" ∷ []) zero
