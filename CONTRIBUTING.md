@@ -2,7 +2,7 @@
 
 ## Bugfixes (in code or in documentation)
 
-The best way is to open a pull request.
+The best way is to make a pull request.
 
 ## New ideas or questions
 
