@@ -40,9 +40,14 @@ var state;
 // document element to contain the application DOM
 const domRoot = document.getElementById("root");
 
+// undefined value: this value is not needed during the computation
+function ud(id) {
+  return function () { throw 'undefined value #' + id; };
+};
+
 // marshalling function from JS natural number to Agda Fin type
 function toFin (x) {
-  return (x === 0 ? exports["Fin"]["zero"]("null1") : exports["Fin"]["suc"]("null2")(toFin(x-1)) );
+  return (x === 0 ? exports["Fin"]["zero"](ud(1)) : exports["Fin"]["suc"](ud(2))(toFin(x-1)) );
 };
 
 // conversion from Agda Widget type to DOM elements
@@ -116,7 +121,7 @@ function makeWidget(dir, widget_description) {
 };
 
 window.onload = function() {
-  const w = exports["processMain"]("null")("null")(exports["mainWidget"])
+  const w = exports["processMain"](ud(25))(ud(26))(exports["mainWidget"])
   state = w["proj₂"]["step"];
   domRoot.appendChild(makeWidget("vertical", w["proj₁"]));
 };
@@ -177,7 +182,7 @@ function gen_event(el, inn) {
   function calc_fun(el, fu) {
     const p = el.parentNode;
     return (p == domRoot ? fu
-          : calc_fun(p, exports["WidgetEdit"][(p.childNodes[0] === el ? "modLeft" : "modRight")]("null3")("null4")("null5")("null6")(fu)));
+          : calc_fun(p, exports["WidgetEdit"][(p.childNodes[0] === el ? "modLeft" : "modRight")](ud(3))(ud(4))(ud(5))(ud(6))(fu)));
   };
   var state_tmp = state; state = null;  // TODO: atomic swap (not really needed...)
   if (state_tmp) {
@@ -191,15 +196,15 @@ function gen_event(el, inn) {
 };
 
 function click_event (el) {
-  return gen_event(el, exports["WidgetEdit"]["click"]("null7"));
+  return gen_event(el, exports["WidgetEdit"]["click"](ud(7)));
 };
 function toggle_event (el) {
-  return gen_event(el, exports["WidgetEdit"]["toggle"]("null8")("null9")("null10")("null11"));
+  return gen_event(el, exports["WidgetEdit"]["toggle"](ud(8))(ud(9))(ud(10))(ud(11)));
 };
 function entry_event (el) {
-  return gen_event(el, exports["WidgetEdit"]["setEntry"]("null12")("null13")("null14")("null15")("null16")("null17")("null18")(el.value));
+  return gen_event(el, exports["WidgetEdit"]["setEntry"](ud(12))(ud(13))(ud(14))(ud(15))(ud(16))(ud(17))(ud(18))(el.value));
 };
 function select_event (el) {
-  return gen_event(el, exports["WidgetEdit"]["select"]("null19")("null20")("null21")("null22")("null23")("null24")(toFin(el.selectedIndex)));
+  return gen_event(el, exports["WidgetEdit"]["select"](ud(19))(ud(20))(ud(21))(ud(22))(ud(23))(ud(24))(toFin(el.selectedIndex)));
 };
 
