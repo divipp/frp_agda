@@ -99,10 +99,10 @@ postulate
   primStringEquality : String → String → Bool
   primShowString     : String → String
   showNat : ℕ → String
-{-# COMPILE JS primStringAppend   = function(x) { return function(y) { return x + y; }; } #-}
-{-# COMPILE JS primStringEquality = function(x) { return function(y) { return x === y; }; } #-}
-{-# COMPILE JS primShowString     = function(x) { return JSON.stringify(x); } #-}
-{-# COMPILE JS showNat            = function(x) { return JSON.stringify(x); } #-}
+{-# COMPILE JS primStringAppend   = x => y => x + y #-}
+{-# COMPILE JS primStringEquality = x => y => x === y #-}
+{-# COMPILE JS primShowString     = x => JSON.stringify(x) #-}
+{-# COMPILE JS showNat            = x => JSON.stringify(x) #-}
 
 {-# BUILTIN FLOAT Float #-}
 postulate
@@ -113,12 +113,12 @@ postulate
   minusFloat        : Float → Float → Float
   mulFloat          : Float → Float → Float
   divFloat          : Float → Float → Float
-{-# COMPILE JS parseFloat = function(x) { return myParseFloat(x); } #-}
-{-# COMPILE JS showFloat  = function(x) { return JSON.stringify(x); } #-}
-{-# COMPILE JS plusFloat  = function(x) { return function(y) { return x + y; };} #-}
-{-# COMPILE JS minusFloat = function(x) { return function(y) { return x - y; };} #-}
-{-# COMPILE JS mulFloat   = function(x) { return function(y) { return x * y; };} #-}
-{-# COMPILE JS divFloat   = function(x) { return function(y) { return x / y; };} #-}
+{-# COMPILE JS parseFloat = x => myParseFloat(x) #-}
+{-# COMPILE JS showFloat  = x => JSON.stringify(x) #-}
+{-# COMPILE JS plusFloat  = x => y => x + y #-}
+{-# COMPILE JS minusFloat = x => y => x - y #-}
+{-# COMPILE JS mulFloat   = x => y => x * y #-}
+{-# COMPILE JS divFloat   = x => y => x / y #-}
 
 Iso   = λ (S T A B : Set) → (S → A) × (B → T)
 Lens  = λ (S T A B : Set) → S → A × (B → T)
