@@ -196,15 +196,14 @@ const trans_event = (el, fu) => {
 };
 
 // `handle_event` handles an event `inn` relative to the `el` DOM element
-const handle_event = (el, inn) => {
-  const next = state["step"](exports["Maybe"]["just"](trans_event(el, inn)))["step"];
-  next["proj₁"](
+const handle_event = (el, inn) => state["step"](exports["Maybe"]["just"](trans_event(el, inn)))["step"]["_,_"](
+  {"_,_": (p1, p2) => {
+    p1(
     {"nothing": () => {}
     ,"just": dw => { updateWidget(domRoot.childNodes[0],dw); }
     });
-  state = next["proj₂"];
-};
-
+    state = p2;
+  }});
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // the functions which are called directly by the browser
@@ -214,9 +213,9 @@ const toggle_event = el => handle_event(el, exports["WidgetEdit"]["toggle"](ud(8
 const entry_event  = el => handle_event(el, exports["WidgetEdit"]["setEntry"](ud(12))(ud(13))(ud(14))(ud(15))(ud(16))(ud(17))(ud(18))(el.value));
 const select_event = el => handle_event(el, exports["WidgetEdit"]["select"](ud(19))(ud(20))(ud(21))(ud(22))(ud(23))(ud(24))(toFin(el.selectedIndex)));
 
-window.onload = () => {
-  const w = exports["processMain"](ud(25))(ud(26))(exports["mainWidget"])
-  state = w["proj₂"];
-  domRoot.appendChild(createWidget("vertical", w["proj₁"]));
-};
+window.onload = () => exports["processMain"](ud(25))(ud(26))(exports["mainWidget"])["_,_"](
+  {"_,_": (p1, p2) => {
+    state = p2;
+    domRoot.appendChild(createWidget("vertical", p1));
+  }});
 
