@@ -59,12 +59,9 @@ const toFin = x => (x === 0 ? exports["Fin"]["zero"](ud(1)) : exports["Fin"]["su
 
 // marshalling function from Agda Vec to JS array
 const fromVec = (vec, ch) => vec (
-  { "[]":  () => ch
-  , "_∷_": (_, str, xs) => {
-    ch.push(str);
-    return fromVec(xs, ch);
-    }
-  });
+  [ () => ch
+  , (_, str, xs) => { ch.push(str); return fromVec(xs, ch); }
+  ]);
 
 // `createElem` creates a DOM element from a description
 // example usage:
@@ -91,46 +88,39 @@ const createElem = x => {
 //////////////////////////////////////////////////////////////////////////////////////////////
 // conversion of Agda widget descriptions to DOM elements
 
-const setEnabled = (a, obj) => Object.assign(obj, a (
-  { "enabled":  () => {}
-  , "disabled": () => ({"disabled": true})
-  }));
-const setValidity = a => a (
-  { "valid":   () => []
-  , "invalid": () => ["invalid"]
-  });
+const setEnabled = (a, obj) => Object.assign(obj, a ([() => {}, () => ({"disabled": true})]));
+const setValidity = a => a ([() => [], () => ["invalid"]]);
 
 // pure marshalling function from Agda Widget to a DOM element description
 // `dir` is either 'horizontal' or 'vertical'; it is used only in the "Container" case
 const fromWidget = (dir, widget) => widget (
-  {"Button": (en, str) =>
+  [ (en, str) =>
      [ "button"
      , { "textContent": str
        , "attrs": setEnabled(en, {"input": "button", "onclick": "click_event(this)"})}]
-  ,"CheckBox": (en, checked) =>
+  , (en, checked) =>
      [ "input"
-     , { "checked": checked({"true": () => true, "false": () => false})
+     , { "checked": checked([() => false, () => true])
        , "attrs": setEnabled(en, {"type": "checkbox", "onchange": "toggle_event(this)"})}]
-  ,"ComboBox": (_, en, opts, sel) =>
+  , (_, en, opts, sel) =>
      [ "select"
      , { "children":      fromVec(opts, []).map(str => ["option", {"textContent": str}])
        , "selectedIndex": exports["finToNat"](sel)
        , "attrs":         setEnabled(en, {"oninput": "select_event(this)"})}]
-  ,"Label": str =>
-     [ "span", {"textContent": str, "classList": ['label']} ]
-  ,"Entry": (en, size, name, str, val) =>
+  , (en, size, name, str, val) =>
      [ "input"
      , { "value": str
        , "classList": setValidity(val)
        , "attrs": setEnabled(en, {"type": 'text', "oninput": 'entry_event(this)', "size": size, "name": name})}]
-  ,"Empty": () => [ "span", {} ]
-  ,"Container": (newd, w1, w2) => {
-      const newdir = newd({"horizontal": () => "horizontal", "vertical": () => "vertical"});
+  , str => [ "span", {"textContent": str, "classList": ['label']} ]
+  , () => [ "span", {} ]
+  , (newd, w1, w2) => {
+      const newdir = newd([() => "horizontal", () => "vertical"]);
       return [ "div"
              , { "classList": [dir]
                , "children":  [fromWidget(newdir, w1), fromWidget(newdir, w2)]}];
     }
-  });
+  ]);
 
 // marshalling function from Agda Widget to a DOM element
 const createWidget = (dir, widget) => createElem(fromWidget(dir, widget));
@@ -141,48 +131,29 @@ const createWidget = (dir, widget) => createElem(fromWidget(dir, widget));
 
 // `updateWidget` applies the `ch` change on the `el` DOM element
 const updateWidget = (el, ch) => ch (
-  {"replaceBy": (_, w) => {
+  [ (_1, _2, _3, _4) => { el.checked = not(el.checked); }
+  , null
+  , (_, str) => {
+      if (performance_warnings && str === el.textContent) { console.log('performance waning: label text was setted', el, str); };
+      el.textContent = str;}
+  , (_1, _2, _3, _4, _5, _6, _7, str) => {
+      if (performance_warnings && str === el.value) { console.log('performance waning: entry value was setted', el, str); };
+      el.value = str;}
+  , (_1, _2, _3, _4, _5, _6, idx) => {
+      if (performance_warnings && idx === el.selectedIndex) { console.log('performance waning: option was selected', el, idx); };
+      el.selectedIndex = idx;}
+  , (_1, _2) => ( el.getAttribute("disabled") ? el.removeAttribute("disabled") : el.setAttribute("disabled", true) )
+  , (_1, _2, _3, _4, _5) => { el.classList.toggle('invalid'); }
+  , (_, w) => {
       if (performance_warnings) { console.log('performance log: replaceBy'); };
       const parent = el.parentNode;
       const dir = (parent.classList.contains("vertical") ? "vertical" : "horizontal");
-      parent.replaceChild(createWidget(dir, w), el);
-    }
-  ,"setLabel": (_, str) => {
-      if (performance_warnings && str === el.textContent) { console.log('performance waning: label text was setted', el, str); };
-      el.textContent = str;
-    }
-  ,"setEntry": (_1, _2, _3, _4, _5, _6, _7, str) => {
-      if (performance_warnings && str === el.value) { console.log('performance waning: entry value was setted', el, str); };
-      el.value = str;
-    }
-  ,"select": (_1, _2, _3, _4, _5, _6, idx) => {
-      if (performance_warnings && idx === el.selectedIndex) { console.log('performance waning: option was selected', el, idx); };
-      el.selectedIndex = idx;
-    }
-  ,"toggle": (_1, _2, _3, _4) => {
-      el.checked = not(el.checked);
-    }
-  ,"toggleEnable": (_1, _2) => {
-      if (el.getAttribute("disabled")) {
-        el.removeAttribute("disabled");
-      } else {
-        el.setAttribute("disabled", true);
-      };
-    }
-  ,"toggleValidity": (_1, _2, _3, _4, _5) => {
-      el.classList.toggle('invalid');
-    }
-  ,"modLeft": (_1, _2, _3, _4, w) => {
-      updateWidget(el.childNodes[0],w);
-    }
-  ,"modRight": (_1, _2, _3, _4, w) => {
-      updateWidget(el.childNodes[1],w);
-    }
-  ,"_∙_": (_, w1, w2) => {
-      updateWidget(el,w1);
-      updateWidget(el,w2);
-    }
-  });
+      parent.replaceChild(createWidget(dir, w), el);}
+  , (_1, _2, _3, _4, w) => { updateWidget(el.childNodes[0],w); }
+  , (_1, _2, _3, _4, w) => { updateWidget(el.childNodes[1],w); }
+  , null, null, null, null
+  , (_, w1, w2) => { updateWidget(el,w1); updateWidget(el,w2); }
+  ]);
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -196,12 +167,9 @@ const trans_event = (el, fu) => {
 };
 
 // `handle_event` handles an event `inn` relative to the `el` DOM element
-const handle_event = (el, inn) => exports["Agent"]["step"](exports["Agent"]["step"](state)(exports["Maybe"]["just"](trans_event(el, inn))))(
+const handle_event = (el, inn) => state(x1 => x1)(exports["Maybe"]["just"](trans_event(el, inn)))(x1 => x1)(
   (p1, p2) => {
-    p1(
-    {"nothing": () => {}
-    ,"just": dw => { updateWidget(domRoot.childNodes[0],dw); }
-    });
+    p1([() => {}, dw => { updateWidget(domRoot.childNodes[0],dw); }]);
     state = p2;
   });
 
