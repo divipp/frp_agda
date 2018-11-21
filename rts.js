@@ -30,32 +30,24 @@ const exports = {};
 // (every module uses `exports`)
 const require = _ => exports;
 
-// These primitive functions are directly called in Agda generated JS code
+const mkBool = b => b ? exports["Bool"]["true"] : exports["Bool"]["false"];
+
+// These primitive functions are directly called from Agda generated JS code
 // `exports.primIntegerFromString("0")` is also used to fill in erased arguments by Agda
 exports.primIntegerFromString           = x => parseInt(x, 10);
 exports.primSeq                         = (x, y) => y;
 exports.uprimIntegerPlus                = (x, y) => x + y;
 exports.uprimIntegerMinus               = (x, y) => x - y;
 exports.uprimIntegerMultiply            = (x, y) => x * y;
-exports.uprimIntegerEqual               = (x, y) => x === y;
-exports.uprimIntegerGreaterOrEqualThan  = (x, y) => x >= y;
-exports.uprimIntegerLessThan            = (x, y) => x < y;
-
-// `myParseFloat` is called from the FFI in `Prelude.agda`
-const myParseFloat = x => {
-  const y = Number(x);
-  return (isNaN(y) ? exports["Maybe"]["nothing"] : exports["Maybe"]["just"](y));
-};
-
+exports.uprimIntegerEqual               = (x, y) => mkBool(x === y);
+exports.uprimIntegerGreaterOrEqualThan  = (x, y) => mkBool(x >= y);
+exports.uprimIntegerLessThan            = (x, y) => mkBool(x < y);
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // utility functions
 
 // undefined value: this value is not needed during the computation
-const ud = id => () => { throw 'undefined value #' + id; };
-
-// marshalling function from JS natural number to Agda Fin type
-const toFin = x => (x === 0 ? exports["Fin"]["zero"](ud(1)) : exports["Fin"]["suc"](ud(2))(toFin(x-1)) );
+const ud = id => () => { throw "undefined value #" + id; };
 
 // marshalling function from Agda Vec to JS array
 const fromVec = (vec, ch) => vec (
@@ -175,9 +167,9 @@ const handle_event = (el, inn) => state(x1 => x1)(exports["Maybe"]["just"](trans
 const click_event  = el => handle_event(el, exports["WidgetEdit"]["click"](ud(7)));
 const toggle_event = el => handle_event(el, exports["WidgetEdit"]["toggle"](ud(8))(ud(9))(ud(10))(ud(11)));
 const entry_event  = el => handle_event(el, exports["WidgetEdit"]["setEntry"](ud(12))(ud(13))(ud(14))(ud(15))(ud(16))(ud(17))(ud(18))(el.value));
-const select_event = el => handle_event(el, exports["WidgetEdit"]["select"](ud(19))(ud(20))(ud(21))(ud(22))(ud(23))(ud(24))(toFin(el.selectedIndex)));
+const select_event = el => handle_event(el, exports["WidgetEdit"]["select"](ud(19))(ud(20))(ud(21))(ud(22))(ud(23))(ud(24))(exports["natToFin"](el.selectedIndex)));
 
-window.onload = () => exports["processMain"](ud(25))(ud(26))(exports["mainWidget"])(
+window.onload = () => exports["main"](
   (p1, p2) => {
     state = p2;
     domRoot.appendChild(createElem(fromWidget("vertical", p1)));

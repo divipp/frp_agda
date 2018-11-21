@@ -461,7 +461,7 @@ dateEntry = λ en s → entry'' en 4 s ∘ʷ (prismIT floatPrism ,ᵗ idIT)
 showDates : (Float × Float) → String
 showDates (a , b) = primStringAppend (showFloat a) (primStringAppend " -- " (showFloat b))
 
-mainWidget =
+main = processMain (
        label' "count clicks:"
   <|>  counter 0
 
@@ -491,4 +491,4 @@ mainWidget =
             ⟦  {-(isoIT (showDates) (const nothing)  ,ᵗ idIT) ∘ᵀ entangle-} enta (arr showDates)
             ⟧
        (label' "")
-
+ )

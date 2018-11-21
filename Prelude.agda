@@ -87,6 +87,10 @@ finToNat : Fin n → ℕ
 finToNat zero = zero
 finToNat (suc x) = suc (finToNat x)
 
+natToFin : (n : ℕ) → Fin (suc n)
+natToFin zero = zero
+natToFin (suc m) = suc (natToFin m)
+
 infixr 5 _∷_
 
 data Vec (A : Set) : ℕ → Set where
@@ -99,26 +103,31 @@ postulate
   primStringEquality : String → String → Bool
   primShowString     : String → String
   showNat : ℕ → String
-{-# COMPILE JS primStringAppend   = x => y => x + y #-}
-{-# COMPILE JS primStringEquality = x => y => x === y #-}
-{-# COMPILE JS primShowString     = x => JSON.stringify(x) #-}
-{-# COMPILE JS showNat            = x => JSON.stringify(x) #-}
+{-# COMPILE JS primStringAppend   = x=>y=>x+y #-}
+{-# COMPILE JS primStringEquality = x=>y=>mkBool(x===y) #-}
+{-# COMPILE JS primShowString     = x=>JSON.stringify(x) #-}
+{-# COMPILE JS showNat            = x=>JSON.stringify(x) #-}
 
 {-# BUILTIN FLOAT Float #-}
 postulate
-  parseFloat : String → Maybe Float
-  primFloatShow     : Float → String
+  preParseFloat     : String → Float
   showFloat         : Float → String
   plusFloat         : Float → Float → Float
   minusFloat        : Float → Float → Float
   mulFloat          : Float → Float → Float
   divFloat          : Float → Float → Float
-{-# COMPILE JS parseFloat = x => myParseFloat(x) #-}
-{-# COMPILE JS showFloat  = x => JSON.stringify(x) #-}
-{-# COMPILE JS plusFloat  = x => y => x + y #-}
-{-# COMPILE JS minusFloat = x => y => x - y #-}
-{-# COMPILE JS mulFloat   = x => y => x * y #-}
-{-# COMPILE JS divFloat   = x => y => x / y #-}
+  isNaN             : Float → Bool
+{-# COMPILE JS preParseFloat = x=>Number(x) #-}
+{-# COMPILE JS showFloat  = x=>JSON.stringify(x) #-}
+{-# COMPILE JS plusFloat  = x=>y=>x+y #-}
+{-# COMPILE JS minusFloat = x=>y=>x-y #-}
+{-# COMPILE JS mulFloat   = x=>y=>x*y #-}
+{-# COMPILE JS divFloat   = x=>y=>x/y #-}
+{-# COMPILE JS isNaN      = x=>mkBool(isNaN(x)) #-}
+
+parseFloat : String → Maybe Float
+parseFloat s = if isNaN p then nothing else just p
+  where p = preParseFloat s
 
 Iso   = λ (S T A B : Set) → (S → A) × (B → T)
 Lens  = λ (S T A B : Set) → S → A × (B → T)
@@ -137,10 +146,7 @@ prismToLens (p1 , p2) (just s) with p1 s
 ... | inj₂ t = nothing , const (just t)
 
 floatPrism : Prism String (Maybe String) Float Float
-floatPrism = (parse , show)
-  where
-    parse : String → Float ⊎ Maybe String
-    parse s = maybe (inj₂ nothing) inj₁ (parseFloat s)
+floatPrism =
+    (λ s → maybe (inj₂ nothing) inj₁ (parseFloat s))
+  , (λ x → just (showFloat x))
 
-    show : Float → Maybe String
-    show x = just (showFloat x)
