@@ -6,13 +6,13 @@
 //////////////////////////////////////////////////////////////////////////////////////////////
 // variables
 
-// constant pointer to the application DOM
-const domRoot = document.getElementById("root");
-
 // besides the DOM, `state` is the only mutable state of the application
 // `state` holds a callback function which will be applied on the next browser event
 //   and it will return how to modify the DOM and a new callback
 let state;
+
+// constant pointer to the application DOM
+const domRoot = document.getElementById("root");
 
 // if 'true', events which cannot be detected by the user are logged to the JS console
 // e.g. when a label's text is set to its original content
@@ -24,7 +24,7 @@ const performance_warnings = true;
 
 // `exports` is an Object holding all Agda generated JS code and the primitive functions
 // `exports` remains contant after the browser loads the js source files
-let exports = {};
+const exports = {};
 
 // we assume that modules define distinct global names so no module name spacing is needed
 // (every module uses `exports`)
@@ -65,16 +65,16 @@ const fromVec = (vec, ch) => vec (
 
 // `createElem` creates a DOM element from a description
 // example usage:
-//   createElem(["span", {"textContent": "hello world", "classList": ["label"]}])
+//   createElem(["span", {textContent: "hello world", classList: ["label"]}])
 const createElem = x => {
   const res = document.createElement(x[0]);
   for (const key in x[1]) {
     const el = x[1][key];
     switch (key) {
-      case 'children':
+      case "children":
         for (const i in el) {res.appendChild(createElem(el[i]));};
         break;
-      case 'attrs':
+      case "attrs":
         for (const i in el) {res.setAttribute(i, el[i]);};
         break;
       default:
@@ -88,7 +88,7 @@ const createElem = x => {
 //////////////////////////////////////////////////////////////////////////////////////////////
 // conversion of Agda widget descriptions to DOM elements
 
-const setEnabled = (a, obj) => Object.assign(obj, a ([() => {}, () => ({"disabled": true})]));
+const setEnabled = (a, obj) => Object.assign(obj, a ([() => {}, () => ({disabled: true})]));
 const setValidity = a => a ([() => [], () => ["invalid"]]);
 
 // pure marshalling function from Agda Widget to a DOM element description
@@ -96,35 +96,31 @@ const setValidity = a => a ([() => [], () => ["invalid"]]);
 const fromWidget = (dir, widget) => widget (
   [ (en, str) =>
      [ "button"
-     , { "textContent": str
-       , "attrs": setEnabled(en, {"input": "button", "onclick": "click_event(this)"})}]
+     , { textContent: str
+       , attrs: setEnabled(en, {input: "button", onclick: "click_event(this)"})}]
   , (en, checked) =>
      [ "input"
-     , { "checked": checked([() => false, () => true])
-       , "attrs": setEnabled(en, {"type": "checkbox", "onchange": "toggle_event(this)"})}]
+     , { checked: checked([() => false, () => true])
+       , attrs: setEnabled(en, {type: "checkbox", onchange: "toggle_event(this)"})}]
   , (_, en, opts, sel) =>
      [ "select"
-     , { "children":      fromVec(opts, []).map(str => ["option", {"textContent": str}])
-       , "selectedIndex": exports["finToNat"](sel)
-       , "attrs":         setEnabled(en, {"oninput": "select_event(this)"})}]
+     , { children:      fromVec(opts, []).map(str => ["option", {textContent: str}])
+       , selectedIndex: exports["finToNat"](sel)
+       , attrs:         setEnabled(en, {oninput: "select_event(this)"})}]
   , (en, size, name, str, val) =>
      [ "input"
-     , { "value": str
-       , "classList": setValidity(val)
-       , "attrs": setEnabled(en, {"type": 'text', "oninput": 'entry_event(this)', "size": size, "name": name})}]
-  , str => [ "span", {"textContent": str, "classList": ['label']} ]
+     , { value: str
+       , classList: setValidity(val)
+       , attrs: setEnabled(en, {type: "text", oninput: "entry_event(this)", size: size, name: name})}]
+  , str => [ "span", {textContent: str, classList: ["label"]} ]
   , () => [ "span", {} ]
   , (newd, w1, w2) => {
       const newdir = newd([() => "horizontal", () => "vertical"]);
       return [ "div"
-             , { "classList": [dir]
-               , "children":  [fromWidget(newdir, w1), fromWidget(newdir, w2)]}];
+             , { classList: [dir]
+               , children:  [fromWidget(newdir, w1), fromWidget(newdir, w2)]}];
     }
   ]);
-
-// marshalling function from Agda Widget to a DOM element
-const createWidget = (dir, widget) => createElem(fromWidget(dir, widget));
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // applying Agda widget modification descriptions on DOM elements
@@ -134,21 +130,21 @@ const updateWidget = (el, ch) => ch (
   [ (_1, _2, _3, _4) => { el.checked = not(el.checked); }
   , null
   , (_, str) => {
-      if (performance_warnings && str === el.textContent) { console.log('performance waning: label text was setted', el, str); };
+      if (performance_warnings && str === el.textContent) { console.log("performance waning: label text was setted", el, str); };
       el.textContent = str;}
   , (_1, _2, _3, _4, _5, _6, _7, str) => {
-      if (performance_warnings && str === el.value) { console.log('performance waning: entry value was setted', el, str); };
+      if (performance_warnings && str === el.value) { console.log("performance waning: entry value was setted", el, str); };
       el.value = str;}
   , (_1, _2, _3, _4, _5, _6, idx) => {
-      if (performance_warnings && idx === el.selectedIndex) { console.log('performance waning: option was selected', el, idx); };
+      if (performance_warnings && idx === el.selectedIndex) { console.log("performance waning: option was selected", el, idx); };
       el.selectedIndex = idx;}
-  , (_1, _2) => ( el.getAttribute("disabled") ? el.removeAttribute("disabled") : el.setAttribute("disabled", true) )
-  , (_1, _2, _3, _4, _5) => { el.classList.toggle('invalid'); }
+  , (_1, _2) => el.getAttribute("disabled") ? el.removeAttribute("disabled") : el.setAttribute("disabled", true)
+  , (_1, _2, _3, _4, _5) => { el.classList.toggle("invalid"); }
   , (_, w) => {
-      if (performance_warnings) { console.log('performance log: replaceBy'); };
+      if (performance_warnings) { console.log("performance log: replaceBy"); };
       const parent = el.parentNode;
-      const dir = (parent.classList.contains("vertical") ? "vertical" : "horizontal");
-      parent.replaceChild(createWidget(dir, w), el);}
+      const dir = parent.classList.contains("vertical") ? "vertical" : "horizontal";
+      parent.replaceChild(createElem(fromWidget(dir, w)), el);}
   , (_1, _2, _3, _4, w) => { updateWidget(el.childNodes[0],w); }
   , (_1, _2, _3, _4, w) => { updateWidget(el.childNodes[1],w); }
   , null, null, null, null
@@ -162,8 +158,8 @@ const updateWidget = (el, ch) => ch (
 // `trans_event` translates an event `inn` relative to the `el` DOM element to an event of the document root
 const trans_event = (el, fu) => {
   const p = el.parentNode;
-  return (p == domRoot ? fu
-         : trans_event(p, exports["WidgetEdit"][(p.childNodes[0] === el ? "modLeft" : "modRight")](ud(3))(ud(4))(ud(5))(ud(6))(fu)));
+  return p == domRoot ? fu
+         : trans_event(p, exports["WidgetEdit"][(p.childNodes[0] === el ? "modLeft" : "modRight")](ud(3))(ud(4))(ud(5))(ud(6))(fu));
 };
 
 // `handle_event` handles an event `inn` relative to the `el` DOM element
@@ -184,6 +180,6 @@ const select_event = el => handle_event(el, exports["WidgetEdit"]["select"](ud(1
 window.onload = () => exports["processMain"](ud(25))(ud(26))(exports["mainWidget"])(
   (p1, p2) => {
     state = p2;
-    domRoot.appendChild(createWidget("vertical", p1));
+    domRoot.appendChild(createElem(fromWidget("vertical", p1)));
   });
 
