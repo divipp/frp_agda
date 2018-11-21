@@ -75,8 +75,8 @@ union2mb p q .child nothing .child _ = union2mb p q
 
 data I/O : Set where I O : I/O   -- input and output phases
 
-variable i/o : I/O
 variable p q r s : Tree
+variable i/o : I/O
 
 opposite : I/O → I/O
 opposite I = O
@@ -100,8 +100,8 @@ record Agent (i/o : I/O) (p : Tree) : Set where
 open Agent
 
 _,ᵀ_ : Agent i/o p → Agent i/o q → Agent i/o (p ×ᵀ q)
-_,ᵀ_ {I} a b .step (k , l) = a .step k ,ᵀ b .step l
-_,ᵀ_ {O} a b .step with a .step | b .step
+_,ᵀ_ {i/o = I} a b .step (k , l) = a .step k ,ᵀ b .step l
+_,ᵀ_ {i/o = O} a b .step with a .step | b .step
 ... | i , j | k , l = (i , k) , (j ,ᵀ l)
 
 _∘ᵗ_ : Agent I (alter p q) → Agent I (alter q r) → Agent I (alter p r)
@@ -131,9 +131,9 @@ maybefy f .step (just a) .step with f .step a .step
 IT = λ p q → Agent I (merge p q)
 
 mapAgent : ⟨ i/o ⟩ IT q p → Agent i/o p → Agent i/o q
-mapAgent {I} l i .step hq with l .step hq .step
+mapAgent {i/o = I} l i .step hq with l .step hq .step
 ... | a , l2 = mapAgent l2 (i .step a)
-mapAgent {O} l i .step with i .step
+mapAgent {i/o = O} l i .step with i .step
 ... | a , b with l .step a .step
 ... | c , l2 = c , (mapAgent l2 b)
 
@@ -153,8 +153,8 @@ swapIT : IT (p ×ᵀ q) (q ×ᵀ p)
 swapIT .step (a , b) .step = (b , a) , swapIT
 
 assocIT : ⟨ i/o ⟩ IT ((p ×ᵀ q) ×ᵀ r) (p ×ᵀ (q ×ᵀ r))
-assocIT {I} .step ((a , b) , c) . step = (a , (b , c)) , assocIT {O}
-assocIT {O} .step (a , (b , c)) . step = ((a , b) , c) , assocIT {I}
+assocIT {i/o = I} .step ((a , b) , c) . step = (a , (b , c)) , assocIT {i/o = O}
+assocIT {i/o = O} .step (a , (b , c)) . step = ((a , b) , c) , assocIT {i/o = I}
 
 fstSig : IT (p ×ᵀ Sig A B) p
 fstSig .step (x , y) .step = x , λ where .step x .step → (x , nothing) , fstSig
@@ -174,9 +174,9 @@ noOutput : IT (Sig A B) (InSig B)
 noOutput .step x .step = nothing , λ where .step y .step → y , noOutput
 
 mkIT : Agent i/o p → ⟨ i/o ⟩ IT p NoSig
-mkIT {I} a .step x .step = nothing , mkIT {O} (a .step x)
-mkIT {O} a .step _ .step with a .step
-... | b , c = b , mkIT {I} c
+mkIT {i/o = I} a .step x .step = nothing , mkIT {i/o = O} (a .step x)
+mkIT {i/o = O} a .step _ .step with a .step
+... | b , c = b , mkIT {i/o = I} c
 
 constIT = λ S T A B → IT (alter' S T) (alter' A B)
 
@@ -212,7 +212,7 @@ isoBi i .step (inj₁ x) .step = (i .proj₁ x) , isoBi i
 isoBi i .step (inj₂ x) .step = (i .proj₂ x) , isoBi i
 
 mmb : Bi p q → Agent I (union2mb p q)
-mmb x .step nothing .step = _ , (mmb x)
+mmb x .step nothing .step = _ , mmb x
 mmb x .step (just (inj₁ y)) .step with x .step (inj₁ y) .step
 ... | a , b = a , mmb b
 mmb x .step (just (inj₂ y)) .step with x .step (inj₂ y) .step
@@ -313,7 +313,7 @@ data WidgetEdit  where
 ⟪ click {s} ⟫  = Button enabled s
 ⟪ setLabel l ⟫ = Label l
 ⟪ toggleEnable {w} {e} ⟫ with isInput w | e
-... | just (_ , w') | tt = w'
+... | just (_ , w') | tt = w'     -- note: the JS backend cannot erase 'e', maybe because of the pattern maching on tt here
 ... | nothing | ()
 ⟪ addToLeft  {r} dir w ⟫ = Container dir w r
 ⟪ addToRight {l} dir w ⟫ = Container dir l w
@@ -339,7 +339,7 @@ GUI = WC NoSig
 
 -- `processMain` is automatically applied on `mainWidget` by the run time system
 processMain : WC (Sig A B) → Σ Widget λ w → Agent I (pw I w)
-processMain (w , x) = (w , mapAgent {I} (x ∘ᵀ noInput ∘ᵀ noOutput) (arr id))
+processMain (w , x) = (w , mapAgent {i/o = I} (x ∘ᵀ noInput ∘ᵀ noOutput) (arr id))
 
 -- enforcing  no input ⇒ no output
 ease : WComp i/o w A B → WComp i/o w A B
@@ -359,8 +359,8 @@ _∘ʷ_ : WC p → IT p q → WC q
 ----------------------------------------------------------
 
 button : ∀ i/o → WComp i/o (Button enabled str) ⊤ ⊥
-button I .step nothing  .step = nothing , button O
-button I .step (just click) .step = just _ , button O
+button I .step nothing      .step = nothing , button O
+button I .step (just click) .step = just _  , button O
 button O .step _ .step = nothing , button I
 
 button' : String → WC (OutSig ⊤)
@@ -371,7 +371,7 @@ checkbox I .step nothing  .step = nothing , checkbox O
 checkbox {b} I .step (just toggle) .step = just (not b) , checkbox O
 checkbox O .step nothing .step = nothing , checkbox I
 checkbox {b} O .step (just b') .step with b == b'
-... | true = nothing , checkbox I
+... | true  = nothing     , checkbox I
 ... | false = just toggle , checkbox I
 
 checkbox' : Bool → WC (BiSig Bool)
@@ -428,13 +428,15 @@ container' O .step (just x , just y) .step = just (modLeft x ∙ modRight y) , c
 container : (dir : Direction) → WComp' I w₁ r → WComp' I w₂ s → WComp' I  (Container dir w₁ w₂) (r ×ᵀ s)
 container _ p q = container' I ∘ᵀ (p ,ᵗ q)
 
-fc : Direction → ∀ {p C D} → WC p → WC (Sig C D) → WC p
+fc : Direction → WC p → WC (Sig C D) → WC p
 fc dir (_ , b) (_ , d) = _ , container' {dir} I ∘ᵀ ({-ease {I}-} b ,ᵗ ease {i/o = I} d) ∘ᵀ fstSig
 
 infixr 3 _<->_
 infixr 4 _<|>_
 
+_<|>_ : WC p → WC (Sig C D) → WC p
 _<|>_ = fc horizontal
+_<->_ : WC p → WC (Sig C D) → WC p
 _<->_ = fc vertical
 
 infix 5 _⟦_⟧_
@@ -483,8 +485,8 @@ main = processMain (
   <->  label' "flight booker (unfinished):"
   <|>  ((comboBox' ("one-way" ∷ "return" ∷ []) zero
             ⟦ (mkIT' (arr ( maybe nothing (const (just _))  -- mapMaybe (const _) cannot be used because Agda bug #3380
-                          )) (arr id) ,ᵗ (assocIT {O} ∘ᵀ swapIT))
-            ∘ᵀ assocIT {O}
+                          )) (arr id) ,ᵗ (assocIT {i/o = O} ∘ᵀ swapIT))
+            ∘ᵀ assocIT {i/o = O}
             ∘ᵀ (swapIT ∘ᵀ entangle ,ᵗ joinSig {i/o = I} 0.0 0.0) ∘ᵀ (swapIT ∘ᵀ fstSig)
             ⟧
        (dateEntry enabled "start date" ∘ʷ fstSig ⟦ idIT ⟧ dateEntry disabled "return date")) ∘ʷ noInput)
