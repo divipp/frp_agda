@@ -46,13 +46,10 @@ exports.uprimIntegerLessThan            = (x, y) => mkBool(x < y);
 //////////////////////////////////////////////////////////////////////////////////////////////
 // utility functions
 
-// undefined value: this value is not needed during the computation
-const ud = id => () => { throw "undefined value #" + id; };
-
 // marshalling function from Agda Vec to JS array
 const fromVec = (vec, ch) => vec (
   [ () => ch
-  , (_, str, xs) => { ch.push(str); return fromVec(xs, ch); }
+  , (str, xs) => { ch.push(str); return fromVec(xs, ch); }
   ]);
 
 // `createElem` creates a DOM element from a description
@@ -119,28 +116,28 @@ const fromWidget = (dir, widget) => widget (
 
 // `updateWidget` applies the `ch` change on the `el` DOM element
 const updateWidget = (el, ch) => ch (
-  [ (_1, _2, _3, _4) => { el.checked = not(el.checked); }
+  [ () => { el.checked = not(el.checked); }
   , null
-  , (_, str) => {
+  , str => {
       if (performance_warnings && str === el.textContent) { console.log("performance waning: label text was setted", el, str); };
       el.textContent = str;}
-  , (_1, _2, _3, _4, _5, _6, _7, str) => {
+  , str => {
       if (performance_warnings && str === el.value) { console.log("performance waning: entry value was setted", el, str); };
       el.value = str;}
-  , (_1, _2, _3, _4, _5, _6, idx) => {
+  , idx => {
       if (performance_warnings && idx === el.selectedIndex) { console.log("performance waning: option was selected", el, idx); };
       el.selectedIndex = idx;}
-  , (_1, _2) => el.getAttribute("disabled") ? el.removeAttribute("disabled") : el.setAttribute("disabled", true)
-  , (_1, _2, _3, _4, _5) => { el.classList.toggle("invalid"); }
-  , (_, w) => {
+  , _ => el.getAttribute("disabled") ? el.removeAttribute("disabled") : el.setAttribute("disabled", true)
+  , () => { el.classList.toggle("invalid"); }
+  , w => {
       if (performance_warnings) { console.log("performance log: replaceBy"); };
       const parent = el.parentNode;
       const dir = parent.classList.contains("vertical") ? "vertical" : "horizontal";
       parent.replaceChild(createElem(fromWidget(dir, w)), el);}
-  , (_1, _2, _3, _4, w) => { updateWidget(el.childNodes[0],w); }
-  , (_1, _2, _3, _4, w) => { updateWidget(el.childNodes[1],w); }
+  , w => { updateWidget(el.childNodes[0],w); }
+  , w => { updateWidget(el.childNodes[1],w); }
   , null, null, null, null
-  , (_, w1, w2) => { updateWidget(el,w1); updateWidget(el,w2); }
+  , (w1, w2) => { updateWidget(el,w1); updateWidget(el,w2); }
   ]);
 
 
@@ -151,7 +148,7 @@ const updateWidget = (el, ch) => ch (
 const trans_event = (el, fu) => {
   const p = el.parentNode;
   return p == domRoot ? fu
-         : trans_event(p, exports["WidgetEdit"][(p.childNodes[0] === el ? "modLeft" : "modRight")](ud(3))(ud(4))(ud(5))(ud(6))(fu));
+         : trans_event(p, exports["WidgetEdit"][(p.childNodes[0] === el ? "modLeft" : "modRight")](fu));
 };
 
 // `handle_event` handles an event `inn` relative to the `el` DOM element
@@ -164,10 +161,10 @@ const handle_event = (el, inn) => state(x1 => x1)(exports["Maybe"]["just"](trans
 //////////////////////////////////////////////////////////////////////////////////////////////
 // the functions which are called directly by the browser
 
-const click_event  = el => handle_event(el, exports["WidgetEdit"]["click"](ud(7)));
-const toggle_event = el => handle_event(el, exports["WidgetEdit"]["toggle"](ud(8))(ud(9))(ud(10))(ud(11)));
-const entry_event  = el => handle_event(el, exports["WidgetEdit"]["setEntry"](ud(12))(ud(13))(ud(14))(ud(15))(ud(16))(ud(17))(ud(18))(el.value));
-const select_event = el => handle_event(el, exports["WidgetEdit"]["select"](ud(19))(ud(20))(ud(21))(ud(22))(ud(23))(ud(24))(exports["natToFin"](el.selectedIndex)));
+const click_event  = el => handle_event(el, exports["WidgetEdit"]["click"]);
+const toggle_event = el => handle_event(el, exports["WidgetEdit"]["toggle"]);
+const entry_event  = el => handle_event(el, exports["WidgetEdit"]["setEntry"](el.value));
+const select_event = el => handle_event(el, exports["WidgetEdit"]["select"](exports["natToFin"](el.selectedIndex)));
 
 window.onload = () => exports["main"](
   (p1, p2) => {
