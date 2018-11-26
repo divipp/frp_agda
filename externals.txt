@@ -1,0 +1,22 @@
+agdaRTS.primSeq S
+agdaRTS.primIntegerFromString I
+agdaRTS.uprimIntegerPlus IPlus
+agdaRTS.uprimIntegerMinus IMinus
+agdaRTS.uprimIntegerMultiply IMul
+agdaRTS.uprimIntegerEqual IEq
+agdaRTS.uprimIntegerGreaterOrEqualThan IGE
+agdaRTS.uprimIntegerLessThan ILT
+jAgda.Prelude.natToFin natToFin
+jAgda.Prelude.finToNat finToNat
+jAgda.Prelude.Bool.true T
+jAgda.Prelude.Bool.false F
+jAgda.Prelude.Maybe.just J
+jAgda.Reactive.WidgetEdit.modLeft ML
+jAgda.Reactive.WidgetEdit.modRight MR
+jAgda.Reactive.WidgetEdit.click click
+jAgda.Reactive.WidgetEdit.toggle toggle
+jAgda.Reactive.WidgetEdit.setEntry SE
+jAgda.Reactive.WidgetEdit.select select
+jAgda.Reactive.main main
+
+
