@@ -1,4 +1,13 @@
 
+# Mon Nov 26
+
+- refactore the runtime system with more comments
+- switch to use `js-erasure` branch of the Agda compiler
+- follow the changes in the Agda comiler  
+  Statistics:
+  - minifed JS code: 9368 bytes
+  - gzipped JS code: 3230 bytes
+
 # Tue Nov 13
 
 - more documentation in the README
