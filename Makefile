@@ -1,18 +1,19 @@
 
-all.js: rts2.js jAgda.Reactive.js
-	cat rts2.js jAgda.Reactive.js > $@
+index.html: index1.html rts2.js jAgda.Reactive.js index2.html
+	cat $^ > $@
 
 jAgda.Reactive.js: Reactive.agda Prelude.agda externals.txt
-	agda --js --js-optimize --js-minify --js-output=jAgda.Reactive.js --js-externals=externals.txt --no-main Reactive.agda
+	agda --js --js-optimize --js-minify --js-output=$@ --js-externals=externals.txt --no-main $<
 
-all.js.gz: all.js
+#for benchmarking
+%.gz: %
 	gzip -9knf $<
 
 .PHONEY: run
-run: all.js
-	firefox index.html
+run: index.html
+	firefox $<
 
 #for personal use
 .PHONEY: deploy
-deploy: all.js
-	cp index.html all.js ../../public_html/frp_agda/
+deploy: index.html
+	cp $^ ../../public_html/frp_agda/
