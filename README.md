@@ -12,9 +12,11 @@ This repository is a work-in-progress attempt for defining composable GUI progra
 
 -   [Try little examples online](https://people.inf.elte.hu/divip/frp_agda/index.html)
 
--   How to compile with Agda 2.6.0 (development version):
+-   How to compile the Agda code to JavaScript:
 
-        agda --js --no-main Reactive.agda
+    -   Check out and build the [js-erasure](https://github.com/agda/agda/commits/js-erasure) branch
+        of the Agda compiler
+    -   run `make`
 
 -   How to run with Firefox:
 
@@ -378,6 +380,96 @@ record Agent (i/o : I/O) (p : Tree) : Set where
     step : ΠΣ i/o (p .Branch) λ a → Agent (opposite i/o) (p .child a)
 ```
 
+## Dealing with more parties
+
+### Notation
+
+```
+        p          A : Agent O p
+    A >---> B      B : Agent I p
+```
+
+d = (i/o , p)                      -- directed protocol
+!(i/o , p) = opposite i/o , p      -- inversion of directed protocol
+Agent' (i/o, p) = Agent i/o p
+
+```
+      d  !d        A : Agent' d
+    A-------B      B : Agent' !d
+```
+
+### Agents with multiple protocols
+
+```
+      | r
+      |
+   p  |  q
+   ---A---      A : Agent' (merge p q r)
+```
+
+### Interaction graphs
+
+nodes: agents
+edges: directed protocols
+
+```
+        B
+     q / \ p
+      /   \
+     A-----C
+        r
+```
+
+Modelling multiedges: ...
+
+### Boundaries
+
+boundary: closed suface which divides the space into two parts
+
+bisection at a boundary:
+-   merge all protocols which intersects the boundary
+-   (partially) merge all agents which each side of a boundary
+
+### Modeling oracles
+
+oracle: an agent which is a black box
+oracle elimination: bisect at a boundary which encloses all oracles and
+
+
+```
+     outer world
+    ---------------+---+---+---+--+-------> time
+     agent         |   ^   |   ^  |
+                   |   |   |   |  |
+    inputs/outputs v   |   v   |  v
+                  
+```
+
+
+
+- kommunikáció két féllel (protokollok különböző összefésülése)
+    - mint egy trafó
+    - szinkronizáltan jönnek az üzenetek
+    - vagy-vagy jönnek az üzenetek
+- "lyukas" ágensek, ágens trafók
+    - _o_
+    - _x_
+    - map
+- speciális ágensek
+    - véletlen szám generátor
+    - timer
+
+
+### Is the `Agent` type enough to describe all interactive algorithms?  
+
+TODO: Explain how to describe effects like having a timer, random number generation, ...
+
+
+### Are elements of the `Agent` type composable?  
+
+TODO: Give hints about composition.
+
+
 
 
 
@@ -450,6 +542,19 @@ TODO: more explanation
 # Composable GUI programs
 
 TODO
+
+
+### Egyszerű operációs rendszer
+
+    type Coords = (Int, Int)       -- (1, 1) és (1024, 768) között
+    type Color = (Int, Int, Int)   -- rgb színek
+
+bemenet: egér koordináták  Coords
+         egér gomb         Bool
+
+kimenet: képernyő          Coords → Color
+
+
 
 
 
