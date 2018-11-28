@@ -1,5 +1,5 @@
 
-index.html: index1.html rts2.js jAgda.Reactive.js index2.html
+index.html: index1.html rts.js jAgda.Reactive.js index2.html
 	cat $^ > $@
 
 jAgda.Reactive.js: Reactive.agda Prelude.agda externals.txt
