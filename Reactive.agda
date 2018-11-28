@@ -83,8 +83,8 @@ opposite I = O
 opposite O = I
 
 ΠΣ : I/O → (A : Set) → (A → Set) → Set
-ΠΣ I = Π
-ΠΣ O = Σ
+ΠΣ I A P = (a : A) → P a
+ΠΣ O A P = Σ A P
 
 ⟨_⟩ : I/O → (A → A → B) → A → A → B
 ⟨ I ⟩ = id
@@ -461,7 +461,7 @@ floatEntry = λ s → entry' 4 s ∘ʷ prismIT floatPrism
 dateEntry = λ en s → entry'' en 4 s ∘ʷ (prismIT floatPrism ,ᵗ idIT)
 
 showDates : (Float × Float) → String
-showDates (a , b) = primStringAppend (showFloat a) (primStringAppend " -- " (showFloat b))
+showDates (a , b) = primStringAppend (primShowFloat a) (primStringAppend " -- " (primShowFloat b))
 
 main = processMain (
        label' "count clicks:"

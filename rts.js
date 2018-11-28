@@ -22,17 +22,20 @@ const performance_warnings = true;
 //////////////////////////////////////////////////////////////////////////////////////////////
 // functions called from Agda code
 
-const mkBool = b => b ? T/*true*/ : F/*false*/;
-
 // These primitive functions are directly called from Agda generated JS code
 const S/*primSeq*/      = (x, y) => y;
 const I/*mkInt*/        = x => parseInt(x, 10);
 const IPlus  = (x, y) => x + y;
 const IMinus = (x, y) => x - y;
 const IMul   = (x, y) => x * y;
-const IEq    = (x, y) => mkBool(x === y);
-const IGE    = (x, y) => mkBool(x >= y);
-const ILT    = (x, y) => mkBool(x < y);
+const IEq    = (x, y) => x === y;
+const IGE    = (x, y) => x >= y;
+const ILT    = (x, y) => x < y;
+const FPlus  = x => y => x + y;
+const FMinus = x => y => x - y;
+const FMul   = x => y => x * y;
+const FDiv   = x => y => x / y;
+const show   = x => JSON.stringify(x);
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // utility functions
@@ -80,7 +83,7 @@ const fromWidget = (dir, widget) => widget (
        , A: setEnabled(en, {input: "button", onclick: "clickE(this)"})}]
   , (en, checked) =>
      [ "input"
-     , { checked: checked([_ => false, _ => true])
+     , { checked: checked
        , A: setEnabled(en, {type: "checkbox", onchange: "toggleE(this)"})}]
   , (_, en, opts, sel) =>
      [ "select"
