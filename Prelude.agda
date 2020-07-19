@@ -2,7 +2,6 @@ module Prelude where
 
 open import Data.Unit using (⊤) public
 open import Data.Empty using (⊥) public
-open import Data.Bool using (Bool; true; false; not; if_then_else_) public
 open import Function using (id; const; flip) public
 open import Data.Sum using (_⊎_; inj₁; inj₂) public
 open import Data.Product using (Σ; proj₁; proj₂; _,_; _×_) public
@@ -10,12 +9,24 @@ open import Data.Maybe using (Maybe; nothing; just) public
 open import Data.Nat using (ℕ; _+_; zero; suc) public
 open import Data.Fin using (Fin; zero; suc; toℕ; fromℕ) public
 open import Data.Vec using (Vec; _∷_; []) public
-open import Data.String using (String; primStringAppend) public
-open import Data.Float using (Float; primShowFloat) public
+open import Data.String using (String) public
+open import Data.Float using (Float) renaming (show to primShowFloat) public
 
 open import Agda.Builtin.Float
 
-variable S T A B C D : Set
+variable S T A B C D S' T' A' B' : Set
+
+-- redefine Bool to avoid COMPILE JS pragma on std-lib's Bool
+data Bool : Set where
+  false true : Bool
+
+not : Bool → Bool
+not true = false
+not false = true
+
+if_then_else_ : Bool → A → A → A
+if true  then a else b = a
+if false then a else b = b
 
 _==_ : Bool → Bool → Bool
 true  == false = false
@@ -38,14 +49,14 @@ data _⊍_ (A B : Set) : Set where
 variable n : ℕ
 
 postulate
-  showNat : ℕ → String
-{-# COMPILE JS showNat = show #-}
-
-postulate
+  showNat           : ℕ → String
+  primStringAppend  : String → String → String
   primParseFloat    : String → Float
   isNaN             : Float → Bool
-{-# COMPILE JS primParseFloat = x=>Number(x) #-}
-{-# COMPILE JS isNaN          = x=>isNaN(x) #-}
+{-# COMPILE JS showNat          = a=>JSON.stringify(a) #-}
+{-# COMPILE JS primStringAppend = a=>b=>a+b #-}
+{-# COMPILE JS primParseFloat   = a=>Number(a) #-}
+{-# COMPILE JS isNaN            = a=>b=>b[isNaN(a)?1:0]() #-}
 
 Iso   = λ (S T A B : Set) → (S → A) × (B → T)
 Lens  = λ (S T A B : Set) → S → A × (B → T)

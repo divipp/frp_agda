@@ -1,4 +1,4 @@
-{-# OPTIONS --type-in-type --no-universe-polymorphism #-}
+{-# OPTIONS --type-in-type #-}
 module Reactive where
 
 open import Prelude
@@ -306,10 +306,10 @@ data WidgetEdit  where
 ⟪ replaceBy x ⟫ = x
 ⟪ modLeft  {dir = dir} {w₂ = w₂} p ⟫ = Container dir ⟪ p ⟫ w₂
 ⟪ modRight {dir = dir} {w₁ = w₁} p ⟫ = Container dir w₁ ⟪ p ⟫
-⟪ toggle {checked = b} {en = en} ⟫   = CheckBox en (not b)
+⟪ toggle {en = en} {checked} ⟫   = CheckBox en (not checked)
 ⟪ select {en = en} {vec = vec} fin ⟫ = ComboBox en vec fin
-⟪ setEntry {_} {size} {name} {_} {en} {val} {_} str ⟫ = Entry en size name str val
-⟪ toggleValidity {size} {name} {str} {en} {val} ⟫     = Entry en size name str (oppositeᵛ val)
+⟪ setEntry {_} {en} {size} {name} {_} {val} {_} str ⟫ = Entry en size name str val
+⟪ toggleValidity {en} {size} {name} {str} {val} ⟫     = Entry en size name str (oppositeᵛ val)
 ⟪ click {s} ⟫  = Button enabled s
 ⟪ setLabel l ⟫ = Label l
 ⟪ toggleEnable {w} {e} ⟫ with isInput w | e
@@ -334,12 +334,8 @@ WComp = λ i/o w A B → WComp' i/o w (⟨ i/o ⟩ Sig A B)
 
 WC = λ p → Σ Widget λ w → WComp' I w p
 
--- GUI program
-GUI = WC NoSig
-
--- `processMain` is automatically applied on `mainWidget` by the run time system
-processMain : WC (Sig A B) → Σ Widget λ w → Agent I (pw I w)
-processMain (w , x) = (w , mapAgent {i/o = I} (x ∘ᵀ noInput ∘ᵀ noOutput) (arr id))
+processMain : WC (Sig A B) → Agent O (pw O Empty)
+processMain (w , x) .step = just (replaceBy w) , mapAgent {i/o = I} (x ∘ᵀ noInput ∘ᵀ noOutput) (arr id)
 
 -- enforcing  no input ⇒ no output
 ease : WComp i/o w A B → WComp i/o w A B
@@ -354,7 +350,6 @@ ease' (_ , x) = _ , ease {i/o = I} x
 
 _∘ʷ_ : WC p → IT p q → WC q
 (_ , x) ∘ʷ y = (_ , x ∘ᵀ y)
-
 
 ----------------------------------------------------------
 
@@ -414,7 +409,7 @@ entry {val = v} v' O .step (ii , td) .step with td | ii | v | v'
 ... | just _  | _              | _       | _    = just toggleEnable , entry false I
 
 entryF : ℕ → Abled → String → WC (Sig String (Maybe String) ×ᵀ InSig ⊤)
-entryF size en name = _ , entry {size} {name} {""} {en} {valid} false I
+entryF size en name = _ , entry {en} {size} {name} {""} {valid} false I
 
 container' : ∀ i/o → WComp' i/o (Container dir w₁ w₂) (pw i/o w₁ ×ᵀ pw i/o w₂)
 container' I .step nothing .step = (nothing , nothing) , container' O
@@ -425,7 +420,7 @@ container' O .step (just x , nothing) .step = just (modLeft x) , container' I
 container' O .step (nothing , just y) .step = just (modRight y) , container' I
 container' O .step (just x , just y) .step = just (modLeft x ∙ modRight y) , container' I
 
-container : (dir : Direction) → WComp' I w₁ r → WComp' I w₂ s → WComp' I  (Container dir w₁ w₂) (r ×ᵀ s)
+container : (dir : Direction) → WComp' I w₁ r → WComp' I w₂ s → WComp' I (Container dir w₁ w₂) (r ×ᵀ s)
 container _ p q = container' I ∘ᵀ (p ,ᵗ q)
 
 fc : Direction → WC p → WC (Sig C D) → WC p

@@ -42,3 +42,13 @@ Peter Hancock, Anton Setzer,  2010
 http://www.cs.swan.ac.uk/~csetzer/articles/dtp00.pdf
 
 
+# TODO
+
+Discuss the relation with the following works:
+
+https://pigworker.wordpress.com/2015/01/04/traffic-dependent-session-types/
+
+https://pigworker.wordpress.com/2015/01/29/compositional-processes-for-dependent-sessions/
+
+https://vimeo.com/106073134  -- sent by Máté Kovács
+

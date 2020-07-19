@@ -3,123 +3,159 @@
 
 My goal is to define composable GUI programs.
 
-A definition is compositional if it is either a trivial definition or
-it is made out of simpler self-containing compositional definitions.
-
-After many years of exploration I should admit that depedent types are essential to achieve my goal.  
-It was a surprise that the description of GUI programs with dependent types is easier than I thought.  
 This repository is a work-in-progress attempt for defining composable GUI programs in Agda.
 
--   [Try little examples online](https://people.inf.elte.hu/divip/frp_agda/index.html)
+Currently a little demo GUI application is written in Agda which runs in the browser.
 
--   How to compile the Agda code to JavaScript:
+-   [Try the demo application](https://people.inf.elte.hu/divip/frp_agda/index.html)
+
+-   [Try the demo application (minified and compressed version)](https://people.inf.elte.hu/divip/frp_agda/index.min.html)
+
+-   How to produce the `index.html` and `index.min.html` files:
 
     -   Check out and build the [js-erasure](https://github.com/agda/agda/commits/js-erasure) branch
         of the Agda compiler
     -   run `make`
 
--   How to run with Firefox:
-
-        firefox index.html
-
 
 # Introduction
 
-An algorithm computing a value of type `A` can be defined as a λ-expression of type `A`:
+## What is an algorithm?
+
+An algorithm computing a value `x` of type `A` can be defined as a λ-expression of type `A`:
 
 ```agda
-e : A
+x : A
+x = ...
 ```
 
-For example
+For example, the algorithm computing two can be defined by
 
 ```agda
-1 + 1 : ℕ
+two : ℕ
+two = 1 + 1
 ```
 
-An algorithm computing a `B` from an `A` can be defined as an expression
+An algorithm computing a `B` from an `A` can be defined as a function
 
 ```agda
-e : A → B
+f : A → B
+f = ...
 ```
 
-Not only one can define any algorithm by λ-calculus, but one can do so compositionally.
-I cannot prove this claim, but overwhelmingly lots of examples accumulated to support this claim.
+Not only one can define any algorithm by λ-calculus, but one can do so compositionally.  
+(However, I cannot prove this claim. I believe in it because I have seen so many "functional pearls" and I have not seen any counter-example.)
 
-But, what is an interactive algorithm?  
-Can we define composable interactive algorithms with pure λ-calculus, even without monads?
 
-Think about `(e : A → B)` as an interactive algorithm, where the interaction is trivial:
-`e` takes exactly one input and gives one output.
+## What is an interactive algorithm?  
 
-More complex interactions can be described with more complex types without adding any unusual
-construct to type theory:
+We can define composable interactive algorithms with pure λ-calculus, even without monads.
 
--   An algorithm with *two* inputs and *two* outputs:
+The simplest example is the following.
 
-    ```agda
-    e : ℕ × ℕ → Bool × Bool
-    e (i , j) = (even j , even i)
-    ```
+`(e : A → B)` can be interpreted as a simple interactive algorithm:  
+`e` takes exactly one input, then it gives one output and the interaction is stopped.
 
--   An algorithm which takes an `ℕ`, then returns a `Bool`, then takes another `ℕ` and returns a `Bool`:
+More complex interactions can be described with more complex types.
 
-    ```agda
-    e : ℕ → Bool × (ℕ → Bool)
-    e i = even i , λ j → even (i + j)
-    ```
+### Multiple inputs and outputs
 
-    There is a *callback* function in the definition. We wish to escape the callback hell later though.
+An algorithm with *two* inputs and *two* outputs:
 
--   An algorithm which takes an `(i : ℕ)` and returns `i` natural numbers:
+```agda
+e : ℕ × ℕ → Bool × Bool
+e (i , j) = (even j , even i)
+```
 
-    ```agda
-    e : (i : ℕ) → Vec ℕ i
-    e 0 = []
-    e (suc i) = i ∷ e i
-    ```
+### Interactions with several steps
 
-    A *dependent function* is used to define the shape of the interaction.
+An algorithm which takes an `ℕ`, then returns a `Bool`, *then* takes another `ℕ` and returns a `Bool`:
 
--   An algorithm which takes a `(b : Bool)` and returns `Bool` if `b` is `true` and otherwise takes an
-    `ℕ` too and returns a `Bool`:
+```agda
+e : ℕ → Bool × (ℕ → Bool)
+e i = even i , λ j → even (i + j)
+```
 
-    ```agda
-    e : (b : Bool) → if b then Bool else ℕ → Bool
-    e true = false
-    e false i = even i
-    ```
+Notes:
 
-    No new construct is used here but note how `e` takes different number of arguments in its two alternatives.
+-   The `(λ j → even (i + j))` function is a so called *callback* function.
+    The callback function is returned to the party who started the interaction.
+    This party will call back this function with the second input value.
 
-We extend this idea further using (indexed) algebraic data types to define interactive algorithms.  
-*Coinduction* is needed to support infinite interactions,
-but no other language constructs or concepts like monads are needed.
+-   The callback function depends on the first input value.
+    In other words, the callback function encapsulates the state of the interaction.
+    (The state here refers to the state of the interactive program.)
 
-GUI programs are defined as special interactive algorithms.
+-   The callback function is expected to be called *exactly once*.
+    This expectation can be expressed by *linear types*.  
 
-After knowing what a GUI program is, I give it a try to answer what a
-composable GUI program is.
+    TODO: Use linear type to express this expectation.
+
+-   It is well-known that interaction can be modelled by callback functions.
+    The hard thing is to define complex interactive programs by composing
+    simpler independent interactive programs.
+
+
+### Dynamic interactions
+
+An interaction is *dynamic*, if the *type* of an input/output depends on the *values* of previous inputs/outputs.
+
+For example, an algorithm which takes an `(i : ℕ)` and returns `i` natural numbers:
+
+```agda
+e : (i : ℕ) → Vec ℕ i
+e 0 = []
+e (suc i) = i ∷ e i
+```
+
+A *dependent function* is used to define the shape of the interaction.
+
+Another example:  
+An algorithm which takes a `(b : Bool)` and returns `Bool` if `b` is `true` and otherwise takes an
+`ℕ` too and returns a `Bool`:
+
+```agda
+e : (b : Bool) → if b then Bool else ℕ → Bool
+e true = false
+e false i = even i
+```
+
+Note how `e` takes different number of arguments in its two alternatives.
+
+### Other kind of interactions
+
+We extend this idea further using (indexed) algebraic data types to define interactive algorithms.
+
+*Coinduction* will be needed to support infinite interactions,
+but no other language constructs or concepts (like monads) are needed.
 
 
 # Definition of interactive algorithms
 
-## Communication protocols
+## Protocols
 
-Forget first the identity of the communication parties
-and focus on the type of the communication reactions.
+Forget first the parties of the interaction and focus on the shape of messages instead.
 
-Suppose that the type of a reaction is determined
-by the value of the previous reactions.
-Let's call *(communication) protocol* the set of the rules which determine the types.
+Let's assume, that the shape of each message is well known before receiving the message.  
+In other words, *each message has a type*.
 
-Such protocols can be described by arbitrary branching trees in Agda.
+This assumption is not limiting at all.
+For example, it allows variable-length messages which can be modelled by a dependent pair of length and content.
+
+The assumption also allows that the type of a message may depend on the values of the previous messages.
+
+Let's call *protocol* the rules which determine the types of the messages during the interaction.
+
+Protocols can be modelled by infinite arbitrary branching trees in Agda.
 
 
 ### Infinite arbitrary branching trees
 
-An arbitrary branching tree is tree data structure where each node is annotated by a `Set`
-and there is a child for each element in the set.  
+An infinite arbitrary branching tree is the following tree data structure:
+
+-   Each node is annotated by a set called `Branch`.
+-   Each node has a child for each element of its `Branch` set.
+-   The children are infinite arbitrary branching trees.
 
 One instance of such a tree is:
 
@@ -139,11 +175,11 @@ true/\fal 0|\1 2 3...
  ...  ... ... ... ...
 ```
 
-This tree can be interpreted as a protocol:
+This tree can be interpreted as the following protocol:
 
--   The first reaction has type `Bool`.
--   If the first reaction is `true` then the second reaction has type `⊤`, otherwise it has type `Bool`.
--   If the first two reactions are `true` and `tt` then the third reaction has type `Bool`.
+-   The first message is a `Bool`.
+-   If the first message is `true` then the second message is a `⊤`, otherwise it is a `Bool`.
+-   If the first two messages are `true` and `tt` then the third message is a `Bool`.
 -   ...
 
 The set of arbitrary branching trees can be defined in Agda as follows:
@@ -164,15 +200,16 @@ infiniteBinaryTree .Branch = Bool
 infiniteBinaryTree .child _ = infiniteBinaryTree
 ```
 
-## Parties of communication
+## Parties
 
-First consider only communications with two parties.
+There can be several parties involved in an interaction.  
 
-Let's call the parties *agent* and *(outside) world*.
+We pick a party and look at the interaction from that party's point of view.  
+Let's call the party we pick *agent* and let's call all other parties the *(outside) world*.
 
 ### Input and output
 
-Let's call *output* the reactions of the agent and *input* the reactions of the world.
+Let's call *output* the messages of the agent and *input* the messages of the world to the agent.
 
 Define input and output as `I` and `O` respectively in Agda:
 
@@ -186,6 +223,17 @@ opposite O = I
 ```
 
 ## Communication phases
+
+Assumptions
+
+3.  Each input is immediately followed by an output
+4.  There are no asynchronous outputs
+
+Possible scenarios:
+
+-   ...|input|output|...|input|output|...|input|output|...
+-   |output|...|input|output|...|input|output|...
+
 
 We can annotate each node in the protocol tree depending on who's turn to react.
 (We discuss later the possibility of both parties' reaction at the same time.)
@@ -234,7 +282,7 @@ If the world also makes choices we get a *trace* of the communication:
 ```
 
 
-### Assumption on interleaved input/output phases
+### Assumption on interleaved input/output
 
 Assume that input and output phases are interleaved, so
 each input is followed by an output and vice-versa.  

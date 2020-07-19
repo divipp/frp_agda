@@ -1,7 +1,8 @@
+"use strict";
+
 //////////////////////////////////////////////////////////////////////////////////////////////
 ///// Runtime system for running GUI programs described with pure functions in browsers //////
 //////////////////////////////////////////////////////////////////////////////////////////////
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // variables
@@ -11,59 +12,52 @@
 //   and it will return how to modify the DOM and a new callback
 let state;
 
-// constant pointer to the application DOM
-const domRoot = document.getElementById("root");
-
 // if 'true', events which cannot be detected by the user are logged to the JS console
 // e.g. when a label's text is set to its original content
-const performance_warnings = true;
+const performance_warnings = false;
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // functions called from Agda code
 
 // These primitive functions are directly called from Agda generated JS code
-const S/*primSeq*/      = (x, y) => y;
-const I/*mkInt*/        = x => parseInt(x, 10);
-const IPlus  = (x, y) => x + y;
-const IMinus = (x, y) => x - y;
-const IMul   = (x, y) => x * y;
-const IEq    = (x, y) => x === y;
-const IGE    = (x, y) => x >= y;
-const ILT    = (x, y) => x < y;
-const FPlus  = x => y => x + y;
-const FMinus = x => y => x - y;
-const FMul   = x => y => x * y;
-const FDiv   = x => y => x / y;
-const show   = x => JSON.stringify(x);
+const /*agdaRTS.primSeq*/                       s1 = (x, y) => y;
+const /*agdaRTS.primIntegerFromString*/         s2 = x => parseInt(x, 10);
+const /*agdaRTS.uprimIntegerPlus*/              s3 = (x, y) => x + y;
+const /*agdaRTS.uprimIntegerMinus*/             s4 = (x, y) => x - y;
+const /*agdaRTS.uprimIntegerMultiply*/          s5 = (x, y) => x * y;
+const /*agdaRTS.uprimIntegerEqual*/             s6 = (x, y) => x === y;
+const /*agdaRTS.uprimIntegerGreaterOrEqualThan*/s7 = (x, y) => x >= y;
+const /*agdaRTS.uprimIntegerLessThan*/          s8 = (x, y) => x < y;
+const /*agdaRTS.primFloatPlus*/                 f1 = x => y => x + y;
+const /*agdaRTS.primFloatMinus*/                f2 = x => y => x - y;
+const /*agdaRTS.primFloatTimes*/                f3 = x => y => x * y;
+const /*agdaRTS.primFloatDiv*/                  f4 = x => y => x / y;
+const /*agdaRTS.primShowFloat*/                 f5 = x => JSON.stringify(x);
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // utility functions
 
+const fromBool = t=>t([_=>false,_=>true]);
+
 // marshalling function from Agda Vec to JS array
-const fromVec = (vec, ch) => vec (
-  [ _ => ch
-  , (str, xs) => { ch.push(str); return fromVec(xs, ch); }
+const fromVec = vec => vec (
+  [ _ => []
+  , (x, xs) => [x].concat(fromVec(xs))
   ]);
 
 // `createElem` creates a DOM element from a description
 // example usage:
-//   createElem(["span", {textContent: "hello world", classList: ["label"]}])
-const createElem = x => {
-  const res = document.createElement(x[0]);
-  for (const key in x[1]) {
-    const el = x[1][key];
-    switch (key) {
-      case "C"/*children*/:
-        for (const i in el) {res.appendChild(createElem(el[i]));};
-        break;
-      case "A"/*attributes*/:
-        for (const i in el) {res.setAttribute(i, el[i]);};
-        break;
-      default:
+//   createElem(["span", {textContent: "hello world", classList: ["s3"]}])
+const createElem = ([x0,x1]) => {
+  const res = document.createElement(x0);
+  Object.keys(x1).map(key => {
+    const el = x1[key];
+    key === "C" ? el.map(i => res.appendChild(createElem(i))) :
+      key === "A" ? Object.keys(el).map(i => res.setAttribute(i, el[i])) :
         res[key] = el;
-    };
-  };
+    });
   return res;
 };
 
@@ -71,46 +65,38 @@ const createElem = x => {
 //////////////////////////////////////////////////////////////////////////////////////////////
 // conversion of Agda widget descriptions to DOM elements
 
-const setEnabled = (a, obj) => Object.assign(obj, a ([_ => {}, _ => ({disabled: true})]));
-const setValidity = a => a ([_ => [], _ => ["invalid"]]);
+const setEnabled = (a, obj) => a([_ => obj, _ => (obj.disabled = true, obj)]);
 
 // pure marshalling function from Agda Widget to a DOM element description
-// `dir` is either 'horizontal' or 'vertical'; it is used only in the "Container" case
-const fromWidget = (dir, widget) => widget (
+const fromWidget = widget => widget (
   [ (en, str) =>
-     [ "button"
-     , { textContent: str
-       , A: setEnabled(en, {input: "button", onclick: "clickE(this)"})}]
+     [ "button", { textContent: str
+                 , A: setEnabled(en, {input: "button", onclick: "handle_event(/*jAgda.Reactive.WidgetEdit.click*/t6,this)"})}]
   , (en, checked) =>
-     [ "input"
-     , { checked: checked
-       , A: setEnabled(en, {type: "checkbox", onchange: "toggleE(this)"})}]
+     [ "input", { checked: checked([_=>false,_=>true])
+                , A: setEnabled(en, {type: "checkbox", onchange: "handle_event(/*jAgda.Reactive.WidgetEdit.toggle*/t7,this)"})}]
   , (_, en, opts, sel) =>
-     [ "select"
-     , { C:      fromVec(opts, []).map(str => ["option", {textContent: str}])
-       , selectedIndex: finToNat(sel)
-       , A:         setEnabled(en, {oninput: "selectE(this)"})}]
-  , (en, size, name, str, val) =>
-     [ "input"
-     , { value: str
-       , classList: setValidity(val)
-       , A: setEnabled(en, {type: "text", oninput: "entryE(this)", size: size, name: name})}]
-  , str => [ "span", {textContent: str, classList: ["label"]} ]
+     [ "select", { C: fromVec(opts).map(str => ["option", {textContent: str}])
+                 , selectedIndex: /*jAgda.Data.Fin.Base.toℕ*/t2(sel)
+                 , A: setEnabled(en, {oninput: "handle_event(/*jAgda.Reactive.WidgetEdit.select*/t9(/*jAgda.Data.Fin.Base.fromℕ*/t1(this.selectedIndex)),this)"})}]
+  , (en, s, n, str, val) =>
+     [ "input", { value: str
+                , classList: val([_ => [], _ => ["s4"]])
+                , A: setEnabled(en, {type: "text", oninput: "handle_event(/*jAgda.Reactive.WidgetEdit.setEntry*/t8(this.value),this)", size: s, name: n})}]
+  , str => [ "span", {textContent: str, classList: ["s3"]} ]
   , _ => [ "span", {} ]
-  , (newd, w1, w2) => {
-      const newdir = newd([_ => "horizontal", _ => "vertical"]);
-      return [ "div"
-             , { classList: [dir]
-               , C:  [fromWidget(newdir, w1), fromWidget(newdir, w2)]}];
-    }
+  , (dir, w1, w2) =>
+     [ "div", { classList: [dir([_ => "s1", _ => "s2"])]
+              , C: [fromWidget(w1), fromWidget(w2)]}]
   ]);
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // applying Agda widget modification descriptions on DOM elements
 
 // `updateWidget` applies the `ch` change on the `el` DOM element
-const updateWidget = (el, ch) => ch (
-  [ _ => { el.checked = !el.checked; }
+const updateWidget = el => ch => ch (
+  [ _ => el.checked = !el.checked
   , 0
   , str => {
       if (performance_warnings && str === el.textContent) { console.log("performance waning: label text was setted", el, str); };
@@ -122,16 +108,14 @@ const updateWidget = (el, ch) => ch (
       if (performance_warnings && idx === el.selectedIndex) { console.log("performance waning: option was selected", el, idx); };
       el.selectedIndex = idx;}
   , _ => el.getAttribute("disabled") ? el.removeAttribute("disabled") : el.setAttribute("disabled", true)
-  , _ => { el.classList.toggle("invalid"); }
+  , _ => el.classList.toggle("s4")
   , w => {
       if (performance_warnings) { console.log("performance log: replaceBy"); };
-      const parent = el.parentNode;
-      const dir = parent.classList.contains("vertical") ? "vertical" : "horizontal";
-      parent.replaceChild(createElem(fromWidget(dir, w)), el);}
-  , w => { updateWidget(el.childNodes[0],w); }
-  , w => { updateWidget(el.childNodes[1],w); }
+      el.parentNode.replaceChild(createElem(fromWidget(w)), el);}
+  , updateWidget(el.firstChild)
+  , updateWidget(el.lastChild)
   , 0, 0, 0, 0
-  , (w1, w2) => { updateWidget(el,w1); updateWidget(el,w2); }
+  , (w1, w2) => { updateWidget(el)(w1); updateWidget(el)(w2); }
   ]);
 
 
@@ -139,30 +123,29 @@ const updateWidget = (el, ch) => ch (
 // encoding user events as values of the `WidgetEdit` Agda data type
 
 // `trans_event` translates an event `inn` relative to the `el` DOM element to an event of the document root
-const trans_event = (el, fu) => {
+const trans_event = (el, ev) => {
   const p = el.parentNode;
-  return p == domRoot ? fu
-         : trans_event(p, (p.childNodes[0] === el ? ML/*modLeft*/ : MR/*modRight*/)(fu));
+  return p === /*document.body*/k1 ? ev : trans_event(p, (p.firstChild === el ? /*jAgda.Reactive.WidgetEdit.modLeft*/t4 : /*jAgda.Reactive.WidgetEdit.modRight*/t5)(ev));
 };
 
-// `handle_event` handles an event `inn` relative to the `el` DOM element
-const handle_event = (el, inn) => state(x1 => x1)(J/*just*/(trans_event(el, inn)))(x1 => x1)(
-  (p1, p2) => {
-    p1([_ => {}, dw => { updateWidget(domRoot.childNodes[0],dw); }]);
-    state = p2;
-  });
+const update = st => st(x => x)((delta, newState) => {
+  delta([ /*nothing*/_ => {}
+        , /*just*/updateWidget(/*document.body*/k1.firstChild)]);
+  state = newState
+});
+
+// the function called on the load of the html page
+const e3 = update;
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // the functions which are called directly by the browser
 
-const clickE  = el => handle_event(el, click);
-const toggleE = el => handle_event(el, toggle);
-const entryE  = el => handle_event(el, SE/*setEntry*/(el.value));
-const selectE = el => handle_event(el, select(natToFin(el.selectedIndex)));
+// `handle_event` handles an event `ev` relative to the `el` DOM element
+const handle_event = (ev, el) => update(state(x => x)(/*jAgda.Data.Maybe.Base.Maybe.just*/t3(trans_event(el, ev))));
 
-window.onload = _ => main(
-  (p1, p2) => {
-    state = p2;
-    domRoot.appendChild(createElem(fromWidget("vertical", p1)));
-  });
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////// JavaScript code generated from Agda code ////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
 
